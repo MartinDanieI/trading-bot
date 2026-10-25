@@ -1,0 +1,88 @@
+name: Escáner horario BTC / XAU
+
+on:
+  schedule:
+    # Cada hora en punto (GitHub usa UTC; puede retrasarse unos minutos en horas pico)
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Solo mostrar el mensaje en el log (no enviar WhatsApp)"
+        type: boolean
+        default: false
+      mode:
+        description: "Modo de alerta para esta ejecución"
+        type: choice
+        options: [default, SIGNALS_ONLY, HOURLY_SUMMARY]
+        default: default
+
+concurrency:
+  group: hourly-scanner
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write # necesario para guardar el caché del estado anti-spam
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+      WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+      WHATSAPP_TO: ${{ secrets.WHATSAPP_TO }}
+      CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      ALERT_PROVIDER: ${{ vars.ALERT_PROVIDER || 'auto' }}
+      # Opcionales (Settings > Secrets and variables > Actions > Variables)
+      ALERT_MODE: ${{ vars.ALERT_MODE || 'SIGNALS_ONLY' }}
+      SCORE_THRESHOLD: ${{ vars.SCORE_THRESHOLD || '70' }}
+      COOLDOWN_HOURS: ${{ vars.COOLDOWN_HOURS || '4' }}
+      WHATSAPP_TEMPLATE_NAME: ${{ vars.WHATSAPP_TEMPLATE_NAME || 'hello_world' }}
+      WHATSAPP_TEMPLATE_LANG: ${{ vars.WHATSAPP_TEMPLATE_LANG || 'en_US' }}
+      WHATSAPP_TEMPLATE_HAS_BODY_PARAM: ${{ vars.WHATSAPP_TEMPLATE_HAS_BODY_PARAM || 'false' }}
+      WHATSAPP_ALWAYS_TEMPLATE: ${{ vars.WHATSAPP_ALWAYS_TEMPLATE || 'false' }}
+      STATE_BACKEND: json
+      STATE_FILE: state/last_signals.json
+      DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-standalone.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-standalone.txt
+
+      # El estado anti-spam (última señal por activo) vive en un JSON que se
+      # restaura del caché de la ejecución anterior y se vuelve a guardar al final.
+      - name: Restaurar estado anti-spam
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: scanner-state-${{ github.run_id }}
+          restore-keys: scanner-state-
+
+      - name: Preparar carpeta de estado
+        run: mkdir -p state && touch state/.keep
+
+      - name: Ejecutar escáner
+        run: |
+          if [ "${{ inputs.mode }}" != "" ] && [ "${{ inputs.mode }}" != "default" ]; then
+            python run_standalone.py --mode "${{ inputs.mode }}"
+          else
+            python run_standalone.py
+          fi
+
+      - name: Guardar estado anti-spam
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: scanner-state-${{ github.run_id }}

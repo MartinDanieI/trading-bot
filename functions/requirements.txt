@@ -1,0 +1,11 @@
+# Dependencias de la Cloud Function (runtime python312). Todas son wheels
+# precompiladas: nada de TA-Lib ni compilación C al desplegar.
+firebase-functions==0.6.0
+firebase-admin==7.7.0
+google-cloud-firestore==2.34.1
+pandas==3.1.0
+numpy==2.5.4
+ccxt==4.5.90
+yfinance==1.7.0
+requests==2.34.2
+tzdata==2026.5
