@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Solo mostrar el mensaje en el log (no enviar WhatsApp)"
+        description: "Solo mostrar el mensaje en el log (no enviar alertas)"
         type: boolean
         default: false
       mode:
@@ -49,9 +49,9 @@ jobs:
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -63,7 +63,7 @@ jobs:
       # El estado anti-spam (última señal por activo) vive en un JSON que se
       # restaura del caché de la ejecución anterior y se vuelve a guardar al final.
       - name: Restaurar estado anti-spam
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: state
           key: scanner-state-${{ github.run_id }}
@@ -82,7 +82,7 @@ jobs:
 
       - name: Guardar estado anti-spam
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: state
           key: scanner-state-${{ github.run_id }}
