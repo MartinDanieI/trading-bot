@@ -171,6 +171,22 @@ WHATSAPP_ALWAYS_TEMPLATE=true
 4. Pestaña **Actions → Escáner horario BTC / XAU → Run workflow** para probarlo en un clic
    (marca *dry_run* si solo quieres ver el mensaje en el log). Desde ahí corre solo cada hora.
 
+### Ejecución puntual cada hora con cron-job.org (recomendado)
+
+El horario propio de GitHub (`schedule`) se retrasa o se salta ejecuciones. Por eso el workflow
+solo lo usa como respaldo cada 2 h, y el disparo principal lo hace **cron-job.org** (gratis):
+
+1. **Token de GitHub:** <https://github.com/settings/personal-access-tokens/new> (fine-grained) →
+   nombre `cron-trading-bot`, expiración 1 año, *Repository access → Only select repositories →
+   trading-bot*, *Permissions → Repository → Actions: Read and write* → **Generate token**.
+2. **Cuenta en <https://cron-job.org>** → **Create cronjob**:
+   - URL: `https://api.github.com/repos/MartinDanieI/trading-bot/actions/workflows/hourly_scanner.yml/dispatches`
+   - Schedule: *Every hour* en el minuto **2** (zona horaria America/Bogota).
+   - Pestaña **Advanced**: método **POST**; cabeceras
+     `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`,
+     `X-GitHub-Api-Version: 2022-11-28`; body `{"ref":"main"}`.
+3. **Test run**: debe responder **204** y aparecer una ejecución "Manually run" en Actions.
+
 Notas:
 - En repos privados GitHub da **2.000 minutos/mes gratis**; cada ejecución consume ~1 minuto → ~744 min/mes.
 - El cron de GitHub puede retrasarse unos minutos en horas pico.
