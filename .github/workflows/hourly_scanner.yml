@@ -2,8 +2,10 @@ name: Escáner horario BTC / XAU
 
 on:
   schedule:
-    # Cada hora en punto (GitHub usa UTC; puede retrasarse unos minutos en horas pico)
-    - cron: "0 * * * *"
+    # Disparo principal: cron-job.org llama cada hora a la API (workflow_dispatch), que es puntual.
+    # Esto es solo un RESPALDO cada 2 horas: el horario propio de GitHub se retrasa o salta
+    # ejecuciones, sobre todo en la hora en punto (por eso el minuto 37).
+    - cron: "37 */2 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -40,6 +42,7 @@ jobs:
       ALERT_MODE: ${{ vars.ALERT_MODE || 'SIGNALS_ONLY' }}
       SCORE_THRESHOLD: ${{ vars.SCORE_THRESHOLD || '70' }}
       COOLDOWN_HOURS: ${{ vars.COOLDOWN_HOURS || '4' }}
+      HEARTBEAT_HOUR: ${{ vars.HEARTBEAT_HOUR || '8' }}
       WHATSAPP_TEMPLATE_NAME: ${{ vars.WHATSAPP_TEMPLATE_NAME || 'hello_world' }}
       WHATSAPP_TEMPLATE_LANG: ${{ vars.WHATSAPP_TEMPLATE_LANG || 'en_US' }}
       WHATSAPP_TEMPLATE_HAS_BODY_PARAM: ${{ vars.WHATSAPP_TEMPLATE_HAS_BODY_PARAM || 'false' }}

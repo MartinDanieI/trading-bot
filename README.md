@@ -49,6 +49,9 @@ Hay señal si el mejor puntaje ≥ `SCORE_THRESHOLD` (70) y supera al de la dire
 
 **Niveles:** Entrada = cierre de la última vela 1h cerrada · SL = 1.5 × ATR(14) · TP1 = 1.5 × riesgo · TP2 = 2.5 × riesgo.
 
+**Mensaje diario "sigo vivo":** una vez al día, desde las `HEARTBEAT_HOUR` (8:00 Bogotá), llega
+`✅ Bot activo` con las señales de las últimas 24 h y los precios. Si un día no llega, revisa GitHub → Actions.
+
 **Anti-spam:** la misma dirección de un activo no se repite durante `COOLDOWN_HOURS` (4 h). Un cambio LONG ↔ SHORT sí se avisa.
 
 **Modos (`ALERT_MODE`):** `SIGNALS_ONLY` (por defecto, solo entradas) o `HOURLY_SUMMARY` (resumen cada hora aunque no haya entrada).
@@ -229,6 +232,7 @@ pero este bot queda dentro de la capa gratuita.
 | `ALERT_MODE` | `SIGNALS_ONLY` | o `HOURLY_SUMMARY` |
 | `SCORE_THRESHOLD` | `70` | Puntaje mínimo para señal |
 | `COOLDOWN_HOURS` | `4` | Horas sin repetir la misma señal |
+| `HEARTBEAT_HOUR` | `8` | Hora local del mensaje diario (`-1` lo apaga) |
 | `WHATSAPP_TEMPLATE_NAME` / `_LANG` | `hello_world` / `en_US` | Plantilla de respaldo |
 | `WHATSAPP_TEMPLATE_HAS_BODY_PARAM` | `false` | La plantilla lleva `{{1}}` |
 | `WHATSAPP_ALWAYS_TEMPLATE` | `false` | Enviar siempre por plantilla |

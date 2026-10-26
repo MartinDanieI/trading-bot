@@ -25,6 +25,9 @@ from .config import Settings, running_on_gcp
 log = logging.getLogger(__name__)
 
 COLLECTION = "scanner_state"
+HISTORY_KEY = "_HISTORY"  # señales enviadas (últimas 48h), para el mensaje diario
+HEARTBEAT_KEY = "_HEARTBEAT"  # fecha del último "sigo vivo"
+HISTORY_KEEP = timedelta(hours=48)
 
 
 def _doc_id(asset: str) -> str:
@@ -127,3 +130,36 @@ class StateManager:
             self._backend.put(asset, record)
         except Exception as exc:  # noqa: BLE001
             log.error("No se pudo guardar el estado de %s: %s", asset, exc)
+        self._append_history(record, now)
+
+    # ------------------------------------------------------------------ #
+    # Historial y mensaje diario "sigo vivo"
+    # ------------------------------------------------------------------ #
+    def _get(self, key: str) -> dict:
+        try:
+            return self._backend.get(key) or {}
+        except Exception as exc:  # noqa: BLE001
+            log.error("No se pudo leer %s: %s", key, exc)
+            return {}
+
+    def _put(self, key: str, value: dict) -> None:
+        try:
+            self._backend.put(key, value)
+        except Exception as exc:  # noqa: BLE001
+            log.error("No se pudo guardar %s: %s", key, exc)
+
+    def _append_history(self, record: dict, now: datetime) -> None:
+        items = [i for i in self._get(HISTORY_KEY).get("items", [])
+                 if now - datetime.fromisoformat(i["sent_at"]) < HISTORY_KEEP]
+        items.append(record)
+        self._put(HISTORY_KEY, {"items": items})
+
+    def signals_since(self, since: datetime) -> list[dict]:
+        return [i for i in self._get(HISTORY_KEY).get("items", [])
+                if datetime.fromisoformat(i["sent_at"]) >= since]
+
+    def heartbeat_sent_on(self, local_date: str) -> bool:
+        return self._get(HEARTBEAT_KEY).get("date") == local_date
+
+    def mark_heartbeat(self, local_date: str) -> None:
+        self._put(HEARTBEAT_KEY, {"date": local_date})

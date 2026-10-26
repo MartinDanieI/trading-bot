@@ -6,7 +6,7 @@ Lo usan tanto la Cloud Function (main.py) como run_standalone.py.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .config import Settings, load_settings
@@ -72,6 +72,30 @@ def format_summary_block(a: Analysis) -> str:
         lines.append(f"🎯 E {_fmt(lv.entry)} · 🛑 SL {_fmt(lv.stop_loss)} · "
                      f"✅ TP1 {_fmt(lv.tp1)} · TP2 {_fmt(lv.tp2)}")
         lines.append(f"💡 {' · '.join(a.reasons[:4])}")
+    return "\n".join(lines)
+
+
+def format_heartbeat(settings: Settings, now: datetime, analyses: list[Analysis],
+                     gold_open: bool, errors: dict[str, str], recent: list[dict]) -> str:
+    tz = ZoneInfo(settings.timezone)
+    if recent:
+        detail = ", ".join(
+            f"{r['asset']} {r['direction']} {datetime.fromisoformat(r['sent_at']).astimezone(tz):%H:%M}"
+            for r in recent
+        )
+        signals = f"{len(recent)} ({detail})"
+    else:
+        signals = "0 (mercado sin entradas claras)"
+    prices = [f"{a.asset.split('/')[0]} {_fmt(a.price)} ({a.change_24h_pct:+.1f}%)" for a in analyses]
+    if not gold_open:
+        prices.append("Oro: mercado cerrado")
+    lines = [
+        f"✅ *Bot activo* · {_stamp(settings, now)}",
+        f"📬 Señales últimas 24h: {signals}",
+        f"💲 {' · '.join(prices)}",
+    ]
+    lines += [f"❗ {asset}: sin datos en esta revisión" for asset in errors]
+    lines.append("_Si mañana no llega este mensaje, revisen GitHub → Actions._")
     return "\n".join(lines)
 
 
@@ -156,6 +180,18 @@ def run_scan(
     for a in fresh:
         if sent[a.asset].get("delivered_as") not in ("console", "error"):
             state.record_signal(a.asset, a.direction, a.score, a.price, now)
+
+    # "Sigo vivo": una vez al día, en la primera revisión desde HEARTBEAT_HOUR (hora local).
+    # Se usa ">=" y no "==" para que llegue aunque GitHub se salte la ejecución de esa hora.
+    local = now.astimezone(ZoneInfo(settings.timezone))
+    today = local.date().isoformat()
+    if 0 <= settings.heartbeat_hour <= local.hour and not state.heartbeat_sent_on(today):
+        recent = state.signals_since(now - timedelta(hours=24))
+        text = format_heartbeat(settings, now, analyses, gold_open, errors, recent)
+        result = _deliver(settings, text, dry_run)
+        deliveries.append(result)
+        if result.get("delivered_as") not in ("console", "error"):
+            state.mark_heartbeat(today)
 
     return {
         "timestamp": now.isoformat(),

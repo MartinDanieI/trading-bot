@@ -107,6 +107,9 @@ def _fetch_kraken(symbol: str, timeframe: str) -> pd.DataFrame:
 def _fetch_yahoo(ticker: str, timeframe: str) -> pd.DataFrame:
     import yfinance as yf
 
+    # yfinance reinicia los filtros al importarse: se vuelve a silenciar aquí
+    warnings.filterwarnings("ignore", module=r"yfinance(\.|$)")
+
     def _call() -> pd.DataFrame:
         raw = yf.Ticker(ticker).history(
             period=YF_PERIOD[timeframe], interval=timeframe, auto_adjust=False, prepost=False

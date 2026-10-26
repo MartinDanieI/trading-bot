@@ -49,6 +49,7 @@ class Settings:
     alert_mode: str
     score_threshold: float
     cooldown_hours: float
+    heartbeat_hour: int  # hora local del "sigo vivo" diario; -1 lo desactiva
     timezone: str
 
     # Estado
@@ -103,6 +104,7 @@ def load_settings() -> Settings:
         alert_mode=mode,
         score_threshold=_float("SCORE_THRESHOLD", 70.0),
         cooldown_hours=_float("COOLDOWN_HOURS", 4.0),
+        heartbeat_hour=int(_float("HEARTBEAT_HOUR", 8)),
         timezone=os.getenv("REPORT_TIMEZONE", "America/Bogota").strip(),
         state_backend=os.getenv("STATE_BACKEND", "auto").strip().lower(),
         state_file=os.getenv("STATE_FILE", "state/last_signals.json").strip(),
