@@ -166,6 +166,37 @@ def fetch_gold() -> MarketData:
     return data
 
 
+def fetch_live_price(asset: str, source: str) -> float | None:
+    """Último precio negociado, de la misma fuente que usó el análisis.
+
+    Se consulta justo antes de enviar una señal para saber si el precio ya se
+    alejó de la entrada. Devuelve None si ninguna fuente responde.
+    """
+    if "Kraken" in source:
+        symbol = "PAXG/USD" if "PAXG" in source else "BTC/USD"
+        try:
+            import ccxt
+
+            def _ticker() -> float:
+                return float(ccxt.kraken({"enableRateLimit": True, "timeout": 15000})
+                             .fetch_ticker(symbol)["last"])
+
+            return with_retries(_ticker, f"precio en vivo {symbol}", attempts=2, base_delay=1)
+        except DataUnavailableError as exc:
+            log.warning("%s", exc)
+    import yfinance as yf
+
+    warnings.filterwarnings("ignore", module=r"yfinance(\.|$)")
+    for ticker in HISTORY_TICKERS[asset]:
+        try:
+            raw = yf.Ticker(ticker).history(period="1d", interval="1m")
+            if raw is not None and not raw.empty:
+                return float(raw["Close"].dropna().iloc[-1])
+        except Exception as exc:  # noqa: BLE001
+            log.warning("precio en vivo %s: %s", ticker, exc)
+    return None
+
+
 HISTORY_TICKERS = {"BTC/USD": ["BTC-USD"], "XAU/USD": ["GC=F", "XAUUSD=X"]}
 HISTORY_KRAKEN = {"BTC/USD": "BTC/USD", "XAU/USD": "PAXG/USD"}
 

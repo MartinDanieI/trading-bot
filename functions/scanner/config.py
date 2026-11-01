@@ -52,6 +52,8 @@ class Settings:
     heartbeat_hour: int  # hora local del "sigo vivo" diario; -1 lo desactiva
     report_weekday: int  # día del reporte semanal: 0=lunes ... 6=domingo; -1 lo desactiva
     report_hour: int
+    entry_zone_r: float  # ancho de la zona de entrada a cada lado, en R
+    late_signals: str  # skip (no enviar) | mark (enviar marcada como tarde)
     timezone: str
 
     # Estado
@@ -109,6 +111,8 @@ def load_settings() -> Settings:
         heartbeat_hour=int(_float("HEARTBEAT_HOUR", 8)),
         report_weekday=int(_float("REPORT_WEEKDAY", 6)),
         report_hour=int(_float("REPORT_HOUR", 18)),
+        entry_zone_r=_float("ENTRY_ZONE_R", 0.3),
+        late_signals="mark" if os.getenv("LATE_SIGNALS", "skip").strip().lower() == "mark" else "skip",
         timezone=os.getenv("REPORT_TIMEZONE", "America/Bogota").strip(),
         state_backend=os.getenv("STATE_BACKEND", "auto").strip().lower(),
         state_file=os.getenv("STATE_FILE", "state/last_signals.json").strip(),

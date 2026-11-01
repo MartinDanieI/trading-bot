@@ -56,6 +56,10 @@ Hay señal si el mejor puntaje ≥ `SCORE_THRESHOLD` (70) y supera al de la dire
 `📊 REPORTE SEMANAL` con las señales de los últimos 7 días evaluadas contra el precio real:
 ganadas, perdidas, % de acierto y resultado en R.
 
+**Zona de entrada:** justo antes de enviar una señal el bot consulta el precio en vivo. El mensaje trae
+`📍 Zona de entrada` (entrada ± `ENTRY_ZONE_R` × riesgo, 0.3 por defecto) y el precio al enviar. Si el precio
+ya salió de la zona, la señal no se envía (`LATE_SIGNALS=skip`) o llega como `⏰ SEÑAL TARDE · NO ENTRAR` (`mark`).
+
 **Tipos de mensaje:** 🚨 SEÑAL DE ENTRADA · 💚 ESTADO DEL BOT (diario) · 📊 REPORTE SEMANAL · 🕐 RESUMEN HORARIO.
 
 **Backtest:** `python backtest.py` repite la estrategia hora por hora sobre los últimos 58 días

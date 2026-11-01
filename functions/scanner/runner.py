@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from .config import Settings, load_settings
 from .data_fetcher import (DataUnavailableError, fetch_btc, fetch_gold, fetch_history,
-                           is_gold_market_open)
+                           fetch_live_price, is_gold_market_open)
 from .performance import evaluate_signal, summarize
 from .state_manager import StateManager
 from .strategy import Analysis, analyze
@@ -34,13 +34,25 @@ def _stamp(settings: Settings, now: datetime) -> str:
     return local.strftime("%d/%m %H:%M") + f" ({settings.timezone.split('/')[-1]})"
 
 
-def format_signal(a: Analysis) -> str:
+def entry_check(a: Analysis, live: float | None, zone_r: float) -> dict:
+    """Compara el precio en vivo con la entrada: ¿sigue dentro de la zona?"""
+    lv = a.levels
+    low, high = lv.entry - zone_r * lv.risk, lv.entry + zone_r * lv.risk
+    if live is None:
+        return {"live": None, "moved_r": None, "low": low, "high": high, "late": False}
+    sign = 1 if a.direction == "LONG" else -1
+    return {"live": live, "moved_r": sign * (live - lv.entry) / lv.risk,
+            "low": low, "high": high, "late": not low <= live <= high}
+
+
+def format_signal(a: Analysis, check: dict | None = None) -> str:
     up = a.direction == "LONG"
     head = "🟢 *SUBIDA (LONG)*" if up else "🔴 *BAJADA (SHORT)*"
     lv = a.levels
     reasons = " · ".join(a.reasons[:5])
+    late = bool(check and check["late"])
     lines = [
-        "🚨 *SEÑAL DE ENTRADA* 🚨",
+        "⏰ *SEÑAL TARDE · NO ENTRAR* ⏰" if late else "🚨 *SEÑAL DE ENTRADA* 🚨",
         f"*{a.asset}* — {head}",
         f"📊 Confianza: *{a.score:.0f}/100* · {a.setup}",
         f"💡 {reasons}",
@@ -52,6 +64,14 @@ def format_signal(a: Analysis) -> str:
         f"✅ TP1: *{_fmt(lv.tp1)}*  (1:1.5)",
         f"✅ TP2: *{_fmt(lv.tp2)}*  (1:2.5)",
     ]
+    if check:
+        lines.append("")
+        lines.append(f"📍 Zona de entrada: *{_fmt(check['low'])} – {_fmt(check['high'])}*")
+        if check["live"] is not None:
+            lines.append(f"⚡ Precio al enviar: {_fmt(check['live'])} "
+                         f"({check['moved_r']:+.2f} R desde la entrada)")
+        lines.append("_El precio ya salió de la zona: no entres._" if late
+                     else "_Si el precio sale de la zona antes de entrar, descarta la señal._")
     if a.warnings:
         lines.append(f"⚠️ {' '.join(a.warnings)}")
     return "\n".join(lines)
@@ -223,9 +243,29 @@ def run_scan(
             log.info("%s %s ya enviado hace < %.0fh: se omite.", a.asset, a.direction,
                      settings.cooldown_hours)
 
+    # Zona de entrada: justo antes de avisar se mira el precio en vivo
+    checks = {a.asset: entry_check(a, fetch_live_price(a.asset, a.source), settings.entry_zone_r)
+              for a in fresh}
+    for a in list(fresh):
+        c = checks[a.asset]
+        if c["live"] is not None:
+            log.info("%s precio en vivo %s (%+.2f R) · zona %s – %s", a.asset, _fmt(c["live"]),
+                     c["moved_r"], _fmt(c["low"]), _fmt(c["high"]))
+        if c["late"] and settings.late_signals == "skip" and mode != "HOURLY_SUMMARY":
+            log.info("%s %s: el precio ya salió de la zona de entrada; no se envía.",
+                     a.asset, a.direction)
+            fresh.remove(a)
+
+    def zone_line(a: Analysis) -> str:
+        c = checks.get(a.asset)
+        if not c:
+            return ""
+        late = " · ⏰ *tarde, no entrar*" if c["late"] else ""
+        return f"\n📍 Zona {_fmt(c['low'])} – {_fmt(c['high'])}{late}"
+
     if mode == "HOURLY_SUMMARY":
         blocks = [f"🕐 *RESUMEN HORARIO* · {_stamp(settings, now)}"]
-        blocks += [format_summary_block(a) for a in analyses]
+        blocks += [format_summary_block(a) + zone_line(a) for a in analyses]
         if not gold_open:
             blocks.append("🥇 *XAU/USD* — mercado cerrado.")
         blocks += [f"❗ *{asset}*: sin datos ({msg[:120]})" for asset, msg in errors.items()]
@@ -236,7 +276,7 @@ def run_scan(
     else:
         sent = {}
         for a in fresh:
-            text = f"{format_signal(a)}\n🕐 {_stamp(settings, now)} · {a.source}\n{DISCLAIMER}"
+            text = f"{format_signal(a, checks[a.asset])}\n🕐 {_stamp(settings, now)} · {a.source}\n{DISCLAIMER}"
             sent[a.asset] = _deliver(settings, text, dry_run)
             deliveries.append(sent[a.asset])
 
