@@ -8,6 +8,7 @@ Uso:
     python backtest.py                 # 58 días, BTC y Oro
     python backtest.py --days 30 --asset BTC/USD
     python backtest.py --threshold 80  # probar otro umbral
+    python backtest.py --strategy caja # Box Theory + trampa/ruptura del máximo de ayer
 
 Guarda el detalle de cada operación en out/backtest_<fecha>.csv
 """
@@ -24,6 +25,7 @@ sys.path.insert(0, str(ROOT / "functions"))
 
 import pandas as pd  # noqa: E402
 
+from scanner.daily_box import box_signals, sweep_signals  # noqa: E402
 from scanner.data_fetcher import MarketData, fetch_history, is_gold_market_open  # noqa: E402
 from scanner.performance import evaluate_signal, summarize  # noqa: E402
 from scanner.strategy import analyze  # noqa: E402
@@ -69,6 +71,23 @@ def backtest_asset(asset: str, days: int, threshold: float) -> list:
     return trades
 
 
+def backtest_box(asset: str, days: int) -> list:
+    """Estrategias de la caja del día anterior (functions/scanner/daily_box.py)."""
+    print(f"Descargando {asset} ({days} días)…", flush=True)
+    h1 = fetch_history(asset, "1h", days + 6)
+    m15 = fetch_history(asset, "15m", days)
+    start = m15.index[0] + timedelta(days=1)  # que la caja de ayer ya exista
+    trades = []
+    signals = [s for s in box_signals(h1, asset) + sweep_signals(m15, h1, asset) if s.time >= start]
+    for s in sorted(signals, key=lambda s: s.time):
+        t = evaluate_signal(m15, asset, s.direction, s.time.to_pydatetime(),
+                            s.entry, s.stop_loss, s.tp1, s.tp2)
+        t.setup = s.strategy  # type: ignore[attr-defined]
+        t.score = 0  # type: ignore[attr-defined]
+        trades.append(t)
+    return trades
+
+
 def print_summary(title: str, trades: list) -> None:
     s = summarize(trades)
     acierto = "—" if s["acierto_pct"] is None else f"{s['acierto_pct']:.0f}%"
@@ -88,17 +107,20 @@ def main() -> int:
     p.add_argument("--days", type=int, default=58)
     p.add_argument("--threshold", type=float, default=70)
     p.add_argument("--asset", choices=["BTC/USD", "XAU/USD"], action="append")
+    p.add_argument("--strategy", choices=["actual", "caja"], default="actual")
     args = p.parse_args()
 
     all_trades = []
     for asset in args.asset or ["BTC/USD", "XAU/USD"]:
-        trades = backtest_asset(asset, args.days, args.threshold)
+        trades = (backtest_box(asset, args.days) if args.strategy == "caja"
+                  else backtest_asset(asset, args.days, args.threshold))
         print_summary(f"=== {asset} ===", trades)
         for setup in sorted({t.setup for t in trades}):
             print_summary(f"  · {setup}", [t for t in trades if t.setup == setup])
         all_trades += trades
 
-    print_summary(f"=== TOTAL ({args.days} días, umbral {args.threshold:.0f}) ===", all_trades)
+    label = "caja del día anterior" if args.strategy == "caja" else f"umbral {args.threshold:.0f}"
+    print_summary(f"=== TOTAL ({args.days} días, {label}) ===", all_trades)
 
     if all_trades:
         df = pd.DataFrame([{**t.to_dict(), "setup": t.setup, "score": t.score} for t in all_trades])
@@ -110,7 +132,7 @@ def main() -> int:
             print(f"  {week}: {len(g):3d} señales · acierto {pct:>4} · {g['r'].sum():+6.1f} R")
         out = ROOT / "out"
         out.mkdir(exist_ok=True)
-        path = out / f"backtest_{pd.Timestamp.now():%Y%m%d_%H%M}.csv"
+        path = out / f"backtest_{args.strategy}_{pd.Timestamp.now():%Y%m%d_%H%M}.csv"
         df.to_csv(path, index=False)
         print(f"\nDetalle guardado en {path}")
     return 0
