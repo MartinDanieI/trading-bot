@@ -21,3 +21,6 @@ firestore-debug.log
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Resultados de backtest
+out/

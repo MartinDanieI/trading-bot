@@ -52,6 +52,16 @@ Hay señal si el mejor puntaje ≥ `SCORE_THRESHOLD` (70) y supera al de la dire
 **Mensaje diario "sigo vivo":** una vez al día, desde las `HEARTBEAT_HOUR` (8:00 Bogotá), llega
 `✅ Bot activo` con las señales de las últimas 24 h y los precios. Si un día no llega, revisa GitHub → Actions.
 
+**Reporte semanal:** cada domingo desde las 18:00 (`REPORT_WEEKDAY`, `REPORT_HOUR`) llega
+`📊 REPORTE SEMANAL` con las señales de los últimos 7 días evaluadas contra el precio real:
+ganadas, perdidas, % de acierto y resultado en R.
+
+**Tipos de mensaje:** 🚨 SEÑAL DE ENTRADA · 💚 ESTADO DEL BOT (diario) · 📊 REPORTE SEMANAL · 🕐 RESUMEN HORARIO.
+
+**Backtest:** `python backtest.py` repite la estrategia hora por hora sobre los últimos 58 días
+(BTC y Oro) y muestra acierto y resultado por setup y por semana (`--threshold 80`, `--days 30`).
+El detalle queda en `out/backtest_*.csv`.
+
 **Anti-spam:** la misma dirección de un activo no se repite durante `COOLDOWN_HOURS` (4 h). Un cambio LONG ↔ SHORT sí se avisa.
 
 **Modos (`ALERT_MODE`):** `SIGNALS_ONLY` (por defecto, solo entradas) o `HOURLY_SUMMARY` (resumen cada hora aunque no haya entrada).

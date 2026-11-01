@@ -10,7 +10,9 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .config import Settings, load_settings
-from .data_fetcher import DataUnavailableError, fetch_btc, fetch_gold, is_gold_market_open
+from .data_fetcher import (DataUnavailableError, fetch_btc, fetch_gold, fetch_history,
+                           is_gold_market_open)
+from .performance import evaluate_signal, summarize
 from .state_manager import StateManager
 from .strategy import Analysis, analyze
 from .whatsapp_notifier import WhatsAppError, get_notifier
@@ -38,6 +40,7 @@ def format_signal(a: Analysis) -> str:
     lv = a.levels
     reasons = " · ".join(a.reasons[:5])
     lines = [
+        "🚨 *SEÑAL DE ENTRADA* 🚨",
         f"*{a.asset}* — {head}",
         f"📊 Confianza: *{a.score:.0f}/100* · {a.setup}",
         f"💡 {reasons}",
@@ -90,12 +93,73 @@ def format_heartbeat(settings: Settings, now: datetime, analyses: list[Analysis]
     if not gold_open:
         prices.append("Oro: mercado cerrado")
     lines = [
-        f"✅ *Bot activo* · {_stamp(settings, now)}",
+        f"💚 *ESTADO DEL BOT* · Activo · {_stamp(settings, now)}",
         f"📬 Señales últimas 24h: {signals}",
         f"💲 {' · '.join(prices)}",
     ]
     lines += [f"❗ {asset}: sin datos en esta revisión" for asset in errors]
     lines.append("_Si mañana no llega este mensaje, revisen GitHub → Actions._")
+    return "\n".join(lines)
+
+
+def _short(asset: str) -> str:
+    return "Oro" if asset.startswith("XAU") else asset.split("/")[0]
+
+
+def weekly_report(settings: Settings, now: datetime, history: list[dict]) -> str:
+    """Evalúa las señales de los últimos 7 días contra el precio real (performance.py)."""
+    tz = ZoneInfo(settings.timezone)
+    trades = []
+    for asset in sorted({h["asset"] for h in history}):
+        items = [h for h in history if h["asset"] == asset and h.get("levels")]
+        if not items:
+            continue
+        try:
+            m15 = fetch_history(asset, "15m", 9)
+        except DataUnavailableError as exc:
+            log.error("Reporte semanal: %s", exc)
+            continue
+        for h in items:
+            lv = h["levels"]
+            trades.append(evaluate_signal(m15, asset, h["direction"], datetime.fromisoformat(h["sent_at"]),
+                                          lv["entry"], lv["stop_loss"], lv["tp1"], lv["tp2"]))
+
+    start = (now - timedelta(days=7)).astimezone(tz)
+    lines = [
+        "📊📊 *REPORTE SEMANAL* 📊📊",
+        f"🗓 {start:%d/%m} – {now.astimezone(tz):%d/%m}",
+        "━━━━━━━━━━━━━━━",
+    ]
+    s = summarize(trades)
+    if not trades:
+        lines.append("Esta semana no hubo señales. El mercado no dio entradas claras.")
+    else:
+        pct = "—" if s["acierto_pct"] is None else f"{s['acierto_pct']:.0f}%"
+        lines += [
+            f"🎯 Señales: *{s['senales']}*",
+            f"✅ Ganadas: {s['ganadas']}  ·  ❌ Perdidas: {s['perdidas']}"
+            + (f"  ·  ⏳ Abiertas: {s['abiertas']}" if s["abiertas"] else "")
+            + (f"  ·  ⌛ Sin resolver: {s['expiradas']}" if s["expiradas"] else ""),
+            f"🏆 Acierto: *{pct}*  (llegaron a TP1 antes que al SL)",
+            f"🚀 Llegaron hasta TP2: {s['llegaron_tp2']}",
+            f"💰 Resultado: *{s['total_r']:+.1f} R*",
+            "━━━━━━━━━━━━━━━",
+        ]
+        for asset in sorted({t.asset for t in trades}):
+            a = summarize([t for t in trades if t.asset == asset])
+            apct = "—" if a["acierto_pct"] is None else f"{a['acierto_pct']:.0f}%"
+            lines.append(f"• {_short(asset)}: {a['senales']} señales · acierto {apct} · {a['total_r']:+.1f} R")
+        closed = [t for t in trades if t.outcome != "abierta"]
+        if closed:
+            best = max(closed, key=lambda t: t.r)
+            when = datetime.fromisoformat(best.sent_at).astimezone(tz)
+            lines.append(f"⭐ Mejor: {_short(best.asset)} {best.direction} del {when:%d/%m %H:%M} ({best.r:+.1f} R)")
+        lines += [
+            "━━━━━━━━━━━━━━━",
+            "_R = lo que se arriesga por operación. +2 R = ganar el doble de lo arriesgado._",
+            "_Simulación: 50 % sale en TP1 y el resto en TP2 o en la entrada._",
+        ]
+    lines.append(DISCLAIMER)
     return "\n".join(lines)
 
 
@@ -160,7 +224,7 @@ def run_scan(
                      settings.cooldown_hours)
 
     if mode == "HOURLY_SUMMARY":
-        blocks = [f"🕐 *Resumen 24h* · {_stamp(settings, now)}"]
+        blocks = [f"🕐 *RESUMEN HORARIO* · {_stamp(settings, now)}"]
         blocks += [format_summary_block(a) for a in analyses]
         if not gold_open:
             blocks.append("🥇 *XAU/USD* — mercado cerrado.")
@@ -179,7 +243,8 @@ def run_scan(
     # Solo se registra una señal que realmente se envió (nunca en dry-run)
     for a in fresh:
         if sent[a.asset].get("delivered_as") not in ("console", "error"):
-            state.record_signal(a.asset, a.direction, a.score, a.price, now)
+            state.record_signal(a.asset, a.direction, a.score, a.price, now,
+                                levels=vars(a.levels))
 
     # "Sigo vivo": una vez al día, en la primera revisión desde HEARTBEAT_HOUR (hora local).
     # Se usa ">=" y no "==" para que llegue aunque GitHub se salte la ejecución de esa hora.
@@ -192,6 +257,18 @@ def run_scan(
         deliveries.append(result)
         if result.get("delivered_as") not in ("console", "error"):
             state.mark_heartbeat(today)
+
+    # Reporte semanal: en la primera revisión desde el día y hora configurados.
+    iso = local.isocalendar()
+    week = f"{iso.year}-S{iso.week:02d}"
+    due = (local.weekday() > settings.report_weekday
+           or (local.weekday() == settings.report_weekday and local.hour >= settings.report_hour))
+    if settings.report_weekday >= 0 and due and not state.weekly_sent(week):
+        text = weekly_report(settings, now, state.signals_since(now - timedelta(days=7)))
+        result = _deliver(settings, text, dry_run)
+        deliveries.append(result)
+        if result.get("delivered_as") not in ("console", "error"):
+            state.mark_weekly(week)
 
     return {
         "timestamp": now.isoformat(),

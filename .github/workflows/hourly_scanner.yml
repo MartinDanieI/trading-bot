@@ -43,6 +43,8 @@ jobs:
       SCORE_THRESHOLD: ${{ vars.SCORE_THRESHOLD || '70' }}
       COOLDOWN_HOURS: ${{ vars.COOLDOWN_HOURS || '4' }}
       HEARTBEAT_HOUR: ${{ vars.HEARTBEAT_HOUR || '8' }}
+      REPORT_WEEKDAY: ${{ vars.REPORT_WEEKDAY || '6' }}
+      REPORT_HOUR: ${{ vars.REPORT_HOUR || '18' }}
       WHATSAPP_TEMPLATE_NAME: ${{ vars.WHATSAPP_TEMPLATE_NAME || 'hello_world' }}
       WHATSAPP_TEMPLATE_LANG: ${{ vars.WHATSAPP_TEMPLATE_LANG || 'en_US' }}
       WHATSAPP_TEMPLATE_HAS_BODY_PARAM: ${{ vars.WHATSAPP_TEMPLATE_HAS_BODY_PARAM || 'false' }}

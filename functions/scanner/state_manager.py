@@ -25,9 +25,10 @@ from .config import Settings, running_on_gcp
 log = logging.getLogger(__name__)
 
 COLLECTION = "scanner_state"
-HISTORY_KEY = "_HISTORY"  # señales enviadas (últimas 48h), para el mensaje diario
+HISTORY_KEY = "_HISTORY"  # señales enviadas (últimos 9 días): mensaje diario y reporte semanal
 HEARTBEAT_KEY = "_HEARTBEAT"  # fecha del último "sigo vivo"
-HISTORY_KEEP = timedelta(hours=48)
+WEEKLY_KEY = "_WEEKLY"  # semana ISO del último reporte semanal
+HISTORY_KEEP = timedelta(days=9)
 
 
 def _doc_id(asset: str) -> str:
@@ -117,7 +118,7 @@ class StateManager:
         return now - sent_at < self.cooldown
 
     def record_signal(self, asset: str, direction: str, score: float, price: float,
-                      now: datetime | None = None) -> None:
+                      now: datetime | None = None, levels: dict | None = None) -> None:
         now = now or datetime.now(timezone.utc)
         record = {
             "asset": asset,
@@ -125,6 +126,7 @@ class StateManager:
             "score": score,
             "price": price,
             "sent_at": now.isoformat(),
+            **({"levels": levels} if levels else {}),
         }
         try:
             self._backend.put(asset, record)
@@ -163,3 +165,9 @@ class StateManager:
 
     def mark_heartbeat(self, local_date: str) -> None:
         self._put(HEARTBEAT_KEY, {"date": local_date})
+
+    def weekly_sent(self, week: str) -> bool:
+        return self._get(WEEKLY_KEY).get("week") == week
+
+    def mark_weekly(self, week: str) -> None:
+        self._put(WEEKLY_KEY, {"week": week})

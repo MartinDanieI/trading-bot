@@ -50,6 +50,8 @@ class Settings:
     score_threshold: float
     cooldown_hours: float
     heartbeat_hour: int  # hora local del "sigo vivo" diario; -1 lo desactiva
+    report_weekday: int  # día del reporte semanal: 0=lunes ... 6=domingo; -1 lo desactiva
+    report_hour: int
     timezone: str
 
     # Estado
@@ -105,6 +107,8 @@ def load_settings() -> Settings:
         score_threshold=_float("SCORE_THRESHOLD", 70.0),
         cooldown_hours=_float("COOLDOWN_HOURS", 4.0),
         heartbeat_hour=int(_float("HEARTBEAT_HOUR", 8)),
+        report_weekday=int(_float("REPORT_WEEKDAY", 6)),
+        report_hour=int(_float("REPORT_HOUR", 18)),
         timezone=os.getenv("REPORT_TIMEZONE", "America/Bogota").strip(),
         state_backend=os.getenv("STATE_BACKEND", "auto").strip().lower(),
         state_file=os.getenv("STATE_FILE", "state/last_signals.json").strip(),

@@ -166,6 +166,46 @@ def fetch_gold() -> MarketData:
     return data
 
 
+HISTORY_TICKERS = {"BTC/USD": ["BTC-USD"], "XAU/USD": ["GC=F", "XAUUSD=X"]}
+HISTORY_KRAKEN = {"BTC/USD": "BTC/USD", "XAU/USD": "PAXG/USD"}
+
+
+def fetch_history(asset: str, timeframe: str, days: int) -> pd.DataFrame:
+    """Velas cerradas de los últimos `days` días (backtest y reporte semanal).
+
+    Yahoo da hasta 60 días en 15m y ~2 años en 1h; Kraken (respaldo) solo las
+    últimas 720 velas (~7,5 días en 15m, 30 días en 1h).
+    """
+    import yfinance as yf
+
+    warnings.filterwarnings("ignore", module=r"yfinance(\.|$)")
+    days = min(days, 59) if timeframe == "15m" else days
+    errors = []
+    for ticker in HISTORY_TICKERS[asset]:
+        try:
+            raw = yf.Ticker(ticker).history(period=f"{days}d", interval=timeframe, auto_adjust=False)
+            if raw is None or raw.empty:
+                raise ValueError("respuesta vacía")
+            df = raw.rename(columns=str.lower)
+            idx = pd.DatetimeIndex(df.index)
+            df.index = idx.tz_localize("UTC") if idx.tz is None else idx.tz_convert("UTC")
+            df = df[COLUMNS].astype(float).dropna(subset=["open", "high", "low", "close"])
+            return _drop_unclosed(df[~df.index.duplicated(keep="last")].sort_index(), timeframe)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"yahoo {ticker}: {exc}")
+    try:
+        import ccxt
+
+        rows = ccxt.kraken({"enableRateLimit": True, "timeout": 20000}).fetch_ohlcv(
+            HISTORY_KRAKEN[asset], timeframe=timeframe, limit=720)
+        df = pd.DataFrame(rows, columns=["ts", *COLUMNS])
+        df.index = pd.to_datetime(df.pop("ts"), unit="ms", utc=True)
+        return _drop_unclosed(df.astype(float), timeframe)
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"kraken: {exc}")
+    raise DataUnavailableError(f"{asset} {timeframe}: sin historial ({' | '.join(errors)})")
+
+
 def is_gold_market_open(now: datetime | None = None) -> bool:
     """Horario Forex/Commodities en hora de Nueva York (EST/EDT, con DST automático).
 
