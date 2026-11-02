@@ -24,3 +24,4 @@ Thumbs.db
 
 # Resultados de backtest
 out/
+research/*.csv
