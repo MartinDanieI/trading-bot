@@ -1,46 +1,49 @@
 {
   "days": 58,
-  "generated": "2026-11-02T17:01:17.836245+00:00",
+  "generated": "2026-11-02T17:20:50.150128+00:00",
   "strategies": {
-    "confluencia": {
+    "tendencia_diaria": {
       "BTC/USD": {
-        "senales": 294,
-        "ganadas": 122,
-        "perdidas": 164,
-        "expiradas": 6,
-        "abiertas": 2,
-        "llegaron_tp2": 73,
-        "acierto_pct": 42.7,
-        "total_r": -2.62,
-        "r_promedio": -0.01,
-        "por_dia": 5.1
+        "senales": 78,
+        "ganadas": 38,
+        "perdidas": 40,
+        "expiradas": 0,
+        "abiertas": 0,
+        "llegaron_tp2": 0,
+        "acierto_pct": 48.7,
+        "total_r": 182.11,
+        "r_promedio": 2.33,
+        "periodo_dias": 4182,
+        "por_dia": 0.019
       },
       "XAU/USD": {
-        "senales": 224,
-        "ganadas": 74,
-        "perdidas": 126,
+        "senales": 69,
+        "ganadas": 26,
+        "perdidas": 43,
         "expiradas": 0,
-        "abiertas": 24,
-        "llegaron_tp2": 44,
-        "acierto_pct": 37.0,
-        "total_r": -21.95,
-        "r_promedio": -0.11,
-        "por_dia": 3.9
+        "abiertas": 0,
+        "llegaron_tp2": 0,
+        "acierto_pct": 37.7,
+        "total_r": 53.65,
+        "r_promedio": 0.78,
+        "periodo_dias": 9228,
+        "por_dia": 0.007
       },
       "TOTAL": {
-        "senales": 518,
-        "ganadas": 196,
-        "perdidas": 290,
-        "expiradas": 6,
-        "abiertas": 26,
-        "llegaron_tp2": 117,
-        "acierto_pct": 40.3,
-        "total_r": -24.57,
-        "r_promedio": -0.05,
-        "por_dia": 8.9
+        "senales": 147,
+        "ganadas": 64,
+        "perdidas": 83,
+        "expiradas": 0,
+        "abiertas": 0,
+        "llegaron_tp2": 0,
+        "acierto_pct": 43.5,
+        "total_r": 235.76,
+        "r_promedio": 1.6,
+        "periodo_dias": 6705,
+        "por_dia": 0.022
       }
     },
-    "tendencia": {
+    "swing": {
       "BTC/USD": {
         "senales": 7,
         "ganadas": 1,
@@ -51,6 +54,7 @@
         "acierto_pct": 16.7,
         "total_r": -2.93,
         "r_promedio": -0.49,
+        "periodo_dias": 58,
         "por_dia": 0.1
       },
       "XAU/USD": {
@@ -63,6 +67,7 @@
         "acierto_pct": 40.0,
         "total_r": 0.76,
         "r_promedio": 0.13,
+        "periodo_dias": 58,
         "por_dia": 0.1
       },
       "TOTAL": {
@@ -75,7 +80,49 @@
         "acierto_pct": 27.3,
         "total_r": -2.17,
         "r_promedio": -0.18,
+        "periodo_dias": 58,
         "por_dia": 0.2
+      }
+    },
+    "confluencia": {
+      "BTC/USD": {
+        "senales": 294,
+        "ganadas": 122,
+        "perdidas": 164,
+        "expiradas": 6,
+        "abiertas": 2,
+        "llegaron_tp2": 73,
+        "acierto_pct": 42.7,
+        "total_r": -2.62,
+        "r_promedio": -0.01,
+        "periodo_dias": 58,
+        "por_dia": 5.1
+      },
+      "XAU/USD": {
+        "senales": 224,
+        "ganadas": 74,
+        "perdidas": 126,
+        "expiradas": 0,
+        "abiertas": 24,
+        "llegaron_tp2": 44,
+        "acierto_pct": 37.0,
+        "total_r": -21.95,
+        "r_promedio": -0.11,
+        "periodo_dias": 58,
+        "por_dia": 3.9
+      },
+      "TOTAL": {
+        "senales": 518,
+        "ganadas": 196,
+        "perdidas": 290,
+        "expiradas": 6,
+        "abiertas": 26,
+        "llegaron_tp2": 117,
+        "acierto_pct": 40.3,
+        "total_r": -24.57,
+        "r_promedio": -0.05,
+        "periodo_dias": 58,
+        "por_dia": 8.9
       }
     },
     "reversion": {
@@ -89,6 +136,7 @@
         "acierto_pct": 50.0,
         "total_r": -1.59,
         "r_promedio": -0.27,
+        "periodo_dias": 58,
         "por_dia": 0.1
       },
       "XAU/USD": {
@@ -101,6 +149,7 @@
         "acierto_pct": 0.0,
         "total_r": -3.15,
         "r_promedio": -1.05,
+        "periodo_dias": 58,
         "por_dia": 0.1
       },
       "TOTAL": {
@@ -113,6 +162,7 @@
         "acierto_pct": 33.3,
         "total_r": -4.74,
         "r_promedio": -0.53,
+        "periodo_dias": 58,
         "por_dia": 0.2
       }
     },
@@ -127,6 +177,7 @@
         "acierto_pct": 42.4,
         "total_r": -16.32,
         "r_promedio": -0.17,
+        "periodo_dias": 58,
         "por_dia": 1.7
       },
       "XAU/USD": {
@@ -139,6 +190,7 @@
         "acierto_pct": 28.6,
         "total_r": -24.31,
         "r_promedio": -0.35,
+        "periodo_dias": 58,
         "por_dia": 1.3
       },
       "TOTAL": {
@@ -151,20 +203,63 @@
         "acierto_pct": 36.4,
         "total_r": -40.63,
         "r_promedio": -0.24,
+        "periodo_dias": 58,
         "por_dia": 3.0
+      }
+    },
+    "smc": {
+      "BTC/USD": {
+        "senales": 38,
+        "ganadas": 4,
+        "perdidas": 34,
+        "expiradas": 0,
+        "abiertas": 0,
+        "llegaron_tp2": 2,
+        "acierto_pct": 10.5,
+        "total_r": -36.03,
+        "r_promedio": -0.95,
+        "periodo_dias": 58,
+        "por_dia": 0.7
+      },
+      "XAU/USD": {
+        "senales": 37,
+        "ganadas": 7,
+        "perdidas": 30,
+        "expiradas": 0,
+        "abiertas": 0,
+        "llegaron_tp2": 3,
+        "acierto_pct": 18.9,
+        "total_r": -16.56,
+        "r_promedio": -0.45,
+        "periodo_dias": 58,
+        "por_dia": 0.6
+      },
+      "TOTAL": {
+        "senales": 75,
+        "ganadas": 11,
+        "perdidas": 64,
+        "expiradas": 0,
+        "abiertas": 0,
+        "llegaron_tp2": 5,
+        "acierto_pct": 14.7,
+        "total_r": -52.59,
+        "r_promedio": -0.7,
+        "periodo_dias": 58,
+        "por_dia": 1.3
       }
     },
     "scalping": {
       "BTC/USD": {
-        "senales": 842,
+        "senales": 843,
         "ganadas": 397,
         "perdidas": 433,
         "expiradas": 11,
-        "abiertas": 1,
+        "abiertas": 2,
         "llegaron_tp2": 203,
         "acierto_pct": 47.8,
         "total_r": -422.23,
         "r_promedio": -0.5,
+        "periodo_dias": 58,
         "por_dia": 14.5
       },
       "XAU/USD": {
@@ -177,18 +272,20 @@
         "acierto_pct": 50.4,
         "total_r": -100.58,
         "r_promedio": -0.16,
+        "periodo_dias": 58,
         "por_dia": 11.2
       },
       "TOTAL": {
-        "senales": 1492,
+        "senales": 1493,
         "ganadas": 722,
         "perdidas": 753,
         "expiradas": 14,
-        "abiertas": 3,
+        "abiertas": 4,
         "llegaron_tp2": 364,
         "acierto_pct": 48.9,
         "total_r": -522.81,
         "r_promedio": -0.35,
+        "periodo_dias": 58,
         "por_dia": 25.7
       }
     }

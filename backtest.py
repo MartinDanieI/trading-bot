@@ -93,7 +93,7 @@ def backtest_box(asset: str, days: int) -> list:
 
 
 def backtest_catalog(asset: str, days: int, cache: dict) -> dict[str, list]:
-    """Las 5 estrategias del catálogo sobre el mismo periodo."""
+    """Las estrategias intradía del catálogo sobre el mismo periodo (la diaria va aparte)."""
     def data(tf: str, d: int):
         if (tf, d) not in cache:
             print(f"Descargando {asset} {tf} ({d} días)…", flush=True)
@@ -104,9 +104,11 @@ def backtest_catalog(asset: str, days: int, cache: dict) -> dict[str, list]:
     start = m15.index[0] + timedelta(days=1)
     out = {"confluencia": backtest_asset(asset, days, 70)}
     for sid, detect in DETECTORS.items():
+        if sid == "confluencia":
+            continue
         info = CATALOG[sid]
-        extra = {"4h": 70, "1h": 10}.get(info.timeframe, 0)  # calentamiento de indicadores
-        candles = data(info.timeframe, days + extra)
+        extra = {"4h": 70, "1h": 10}  # calentamiento de indicadores
+        candles = {tf: data(tf, days + extra.get(tf, 0)) for tf in info.needs}
         ev = data(info.eval_tf, days)
         trades = []
         for s in detect(candles, asset):
@@ -117,6 +119,23 @@ def backtest_catalog(asset: str, days: int, cache: dict) -> dict[str, list]:
             t.setup, t.score = sid, 0  # type: ignore[attr-defined]
             trades.append(t)
         out[sid] = trades
+    return out
+
+
+def backtest_daily_trend(asset: str) -> list:
+    """Tendencia diaria con todo el historial diario disponible (años)."""
+    from scanner.daily_trend import replay
+    from scanner.performance import TradeResult
+
+    print(f"Descargando {asset} 1d (todo el historial)…", flush=True)
+    trades, _ = replay(fetch_history(asset, "1d", 9000), asset)
+    out = []
+    for ev in trades:
+        pos = ev["pos"]
+        t = TradeResult(asset, pos["direction"], pos["opened"], pos["entry"], pos["stop"], 0, 0,
+                        "ganada_tp1" if ev["r"] > 0 else "perdida", round(ev["r"], 2), ev["day"])
+        t.setup, t.score = "tendencia_diaria", 0  # type: ignore[attr-defined]
+        out.append(t)
     return out
 
 
@@ -177,9 +196,13 @@ def main() -> int:
 def run_catalog(args) -> int:
     assets = args.asset or ["BTC/USD", "XAU/USD"]
     results = {sid: {} for sid in CATALOG}
+    years = {}
     for asset in assets:
         for sid, trades in backtest_catalog(asset, args.days, {}).items():
             results[sid][asset] = trades
+        results["tendencia_diaria"][asset] = backtest_daily_trend(asset)
+        t = results["tendencia_diaria"][asset]
+        years[asset] = max((pd.Timestamp(t[-1].sent_at) - pd.Timestamp(t[0].sent_at)).days / 365.25, 1) if t else 1
 
     stats = {"days": args.days, "generated": pd.Timestamp.now(tz="UTC").isoformat(), "strategies": {}}
     print(f"\n{'Estrategia':24} {'Activo':8} {'Señales':>8} {'x día':>6} {'Acierto':>8} {'Total R':>8} {'R/señal':>8}")
@@ -188,7 +211,13 @@ def run_catalog(args) -> int:
         for asset in assets + ["TOTAL"]:
             trades = (sum(results[sid].values(), []) if asset == "TOTAL" else results[sid][asset])
             s = summarize(trades)
-            s["por_dia"] = round(s["senales"] / args.days, 1)
+            if sid == "tendencia_diaria":  # periodo de años, no de días
+                span = years.get(asset, sum(years.values()) / max(len(years), 1)) * 365.25
+                s["periodo_dias"] = round(span)
+                s["por_dia"] = round(s["senales"] / span, 3)
+            else:
+                s["periodo_dias"] = args.days
+                s["por_dia"] = round(s["senales"] / args.days, 1)
             entry[asset] = s
             pct = "—" if s["acierto_pct"] is None else f"{s['acierto_pct']:.0f}%"
             avg = "—" if s["r_promedio"] is None else f"{s['r_promedio']:+.2f}"

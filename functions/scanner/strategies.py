@@ -5,11 +5,16 @@ la vela (UTC), entrada, SL, TP1 y TP2. La misma función sirve para el backtest
 (se pasa todo el historial) y para el escaneo en vivo (se pasan las velas
 recientes y solo interesa la señal de la última vela).
 
-    confluencia  1h   Confluencia de EMAs, RSI, MACD y rango de 24h (la estrategia original).
-    tendencia    4h   Ruptura del canal de 20 velas a favor de EMA 50 > EMA 200.
-    reversion    1h   Regreso dentro de las Bandas de Bollinger cuando no hay tendencia (ADX < 20).
-    sesion       15m  Ruptura del rango de la primera hora de Londres y de Nueva York.
-    scalping     5m   Retroceso a la EMA 20 a favor de la tendencia, confirmado con VWAP y RSI 7.
+    tendencia_diaria 1d  Turtle con salida móvil (daily_trend.py). La única con ventaja en el backtest.
+    swing            4h  Ruptura del canal de 20 velas a favor de EMA 50 > EMA 200.
+    confluencia      1h  Confluencia de EMAs, RSI, MACD y rango de 24h (la estrategia original).
+    reversion        1h  Regreso dentro de las Bandas de Bollinger cuando no hay tendencia (ADX < 20).
+    sesion           15m Ruptura del rango de la primera hora de Londres y de Nueva York.
+    smc              15m Barrida de liquidez del máximo/mínimo de ayer (Smart Money).
+    scalping         5m  Retroceso a la EMA 20 a favor de la tendencia, confirmado con VWAP y RSI 7.
+
+Las personas eligen de 1 a 4 en Telegram. El bot las ofrece como guía: solo la
+Tendencia diaria mostró ventaja con costos incluidos (ver backtest.py).
 """
 
 from __future__ import annotations
@@ -46,11 +51,12 @@ class StrategyInfo:
     id: str
     name: str
     emoji: str
-    timeframe: str  # velas que analiza
-    bars: int  # velas que necesita en vivo
+    timeframe: str  # vela que dispara la revisión
+    needs: dict  # {temporalidad: velas} que necesita en vivo
     horizon: timedelta  # tiempo máximo para evaluar una señal (backtest y reporte)
     eval_tf: str  # velas con las que se evalúa si tocó SL o TP
     description: str
+    cooldown: timedelta  # no repetir la misma dirección del mismo activo antes de esto
 
 
 # --------------------------------------------------------------------------- #
@@ -119,7 +125,7 @@ def tendencia(c4h: pd.DataFrame, asset: str) -> list[Signal]:
         sign = 1 if direction == "LONG" else -1
         entry = d["close"].iloc[i]
         level = hi20.iloc[i] if direction == "LONG" else lo20.iloc[i]
-        sigs.append(_signal(d.index[i] + bar, asset, "tendencia", direction, entry,
+        sigs.append(_signal(d.index[i] + bar, asset, "swing", direction, entry,
                             entry - sign * 2 * a.iloc[i], 1.5, 3.0,
                             [f"rompe el {'máximo' if sign > 0 else 'mínimo'} de 20 velas de 4h ({level:,.2f})",
                              f"EMA50 {'>' if sign > 0 else '<'} EMA200 (tendencia {'alcista' if sign > 0 else 'bajista'})"],
@@ -220,25 +226,62 @@ def scalping(c5: pd.DataFrame, asset: str) -> list[Signal]:
     return _cooldown(sigs, 6, bar)
 
 
+def confluencia(data: dict[str, pd.DataFrame], asset: str) -> list[Signal]:
+    """1h: la estrategia original (strategy.analyze). Solo evalúa la última vela."""
+    from .data_fetcher import MarketData
+    from .strategy import analyze
+
+    h1, m15 = data["1h"], data["15m"]
+    a = analyze(MarketData(asset, "", h1.tail(100), m15.tail(100)), threshold=70)
+    if a.direction == "NEUTRAL":
+        return []
+    lv = a.levels
+    return [Signal(h1.index[-1] + timedelta(hours=1), asset, "confluencia", a.direction, lv.entry,
+                   lv.stop_loss, lv.tp1, lv.tp2, [f"puntaje {a.score:.0f}/100 · {a.setup}"] + a.reasons[:4])]
+
+
+def smart_money(data: dict[str, pd.DataFrame], asset: str) -> list[Signal]:
+    """15m: barrida de liquidez del máximo/mínimo de ayer (mecha que lo pasa y cierre de vuelta)."""
+    from .daily_box import sweep_signals
+
+    return [Signal(b.time, asset, "smc", b.direction, b.entry, b.stop_loss, b.tp1, b.tp2,
+                   [b.note, f"máximo de ayer {b.pdh:,.2f} · mínimo de ayer {b.pdl:,.2f}"])
+            for b in sweep_signals(data["15m"], data["1h"], asset) if b.strategy.startswith("Trampa")]
+
+
 CATALOG: dict[str, StrategyInfo] = {
     s.id: s for s in (
-        StrategyInfo("confluencia", "Confluencia", "🧭", "1h", 100, timedelta(hours=48), "15m",
-                     "Combina EMAs, RSI, MACD, volumen y el rango de 24 h en velas de 1 hora."),
-        StrategyInfo("tendencia", "Tendencia", "📈", "4h", 260, timedelta(days=7), "15m",
-                     "Sigue la tendencia grande: entra cuando el precio rompe el máximo o mínimo de "
-                     "20 velas de 4 horas a favor de la EMA 200. Pocas señales, operaciones de días."),
-        StrategyInfo("reversion", "Reversión a la media", "🔄", "1h", 120, timedelta(hours=48), "15m",
+        StrategyInfo("tendencia_diaria", "Tendencia diaria", "📈", "1d", {}, timedelta(days=60), "1d",
+                     "Reglas Turtle en velas diarias: entra cuando el precio rompe el máximo o mínimo de "
+                     "20–55 días y sale con stop móvil. Pocas señales al año, operaciones de semanas. "
+                     "Es la única que ganó en 12 años de datos.", timedelta(0)),
+        StrategyInfo("swing", "Swing 4h", "🏄", "4h", {"4h": 260}, timedelta(days=7), "15m",
+                     "Sigue la tendencia de varios días: ruptura de 20 velas de 4 horas a favor de la "
+                     "EMA 200. Operaciones de días.", timedelta(hours=24)),
+        StrategyInfo("confluencia", "Confluencia", "🧭", "1h", {"1h": 100, "15m": 100}, timedelta(hours=48), "15m",
+                     "Combina EMAs, RSI, MACD, volumen y el rango de 24 horas en velas de 1 hora. "
+                     "Varias señales al día.", timedelta(hours=4)),
+        StrategyInfo("reversion", "Reversión a la media", "🔄", "1h", {"1h": 120}, timedelta(hours=48), "15m",
                      "Cuando el mercado está de lado, compra abajo y vende arriba de las Bandas de "
-                     "Bollinger esperando que vuelva al promedio."),
-        StrategyInfo("sesion", "Ruptura de sesión", "🌍", "15m", 120, timedelta(hours=24), "15m",
+                     "Bollinger esperando el regreso al promedio.", timedelta(hours=4)),
+        StrategyInfo("sesion", "Ruptura de sesión", "🌍", "15m", {"15m": 120}, timedelta(hours=24), "15m",
                      "Marca el rango de la primera hora de Londres y de Nueva York y entra cuando el "
-                     "precio lo rompe. Máximo 2 señales al día por activo."),
-        StrategyInfo("scalping", "Scalping", "⚡", "5m", 150, timedelta(hours=4), "5m",
-                     "Operaciones rápidas de minutos en velas de 5 minutos. Muchas señales; hay que "
-                     "estar pendiente y entrar enseguida."),
+                     "precio lo rompe. Hasta 2 señales al día por activo.", timedelta(hours=3)),
+        StrategyInfo("smc", "Smart Money (liquidez)", "💧", "15m", {"15m": 200, "1h": 80}, timedelta(hours=24), "15m",
+                     "Busca barridas de liquidez: el precio pasa el máximo o mínimo de ayer solo con "
+                     "mecha y cierra de vuelta adentro.", timedelta(hours=12)),
+        StrategyInfo("scalping", "Scalping", "⚡", "5m", {"5m": 150}, timedelta(hours=4), "5m",
+                     "Operaciones de minutos en velas de 5 minutos: retroceso a la EMA 20 a favor de la "
+                     "tendencia con VWAP y RSI. Muchas señales; hay que entrar enseguida.", timedelta(minutes=30)),
     )
 }
 
-DETECTORS: dict[str, Callable[[pd.DataFrame, str], list[Signal]]] = {
-    "tendencia": tendencia, "reversion": reversion, "sesion": sesion, "scalping": scalping,
+# detectores de velas intradía (la Tendencia diaria va aparte: daily_trend.py)
+DETECTORS: dict[str, Callable[[dict[str, pd.DataFrame], str], list[Signal]]] = {
+    "swing": lambda d, a: tendencia(d["4h"], a),
+    "confluencia": confluencia,
+    "reversion": lambda d, a: reversion(d["1h"], a),
+    "sesion": lambda d, a: sesion(d["15m"], a),
+    "smc": smart_money,
+    "scalping": lambda d, a: scalping(d["5m"], a),
 }
