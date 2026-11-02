@@ -117,7 +117,7 @@ def format_initial(asset: str, pos: dict, tz: str) -> str:
 # --------------------------------------------------------------------------- #
 # Proceso diario
 # --------------------------------------------------------------------------- #
-def process_daily(settings: Settings, state: StateManager, deliver: Callable[[str], dict],
+def process_daily(settings: Settings, state: StateManager, deliver: Callable[[str, str], dict],
                   dry_run: bool) -> dict:
     """Procesa las velas diarias nuevas de cada activo. Devuelve un resumen."""
     summary: dict = {"events": [], "errors": {}}
@@ -136,7 +136,7 @@ def process_daily(settings: Settings, state: StateManager, deliver: Callable[[st
         if last_day is None:  # primera vez: reconstruir dónde está la estrategia hoy
             _, pos = replay(raw, asset)
             if pos and not dry_run:
-                result = deliver(format_initial(asset, pos, settings.timezone))
+                result = deliver(format_initial(asset, pos, settings.timezone), asset)
                 if result.get("delivered_as") in ("console", "error"):
                     continue
             if not dry_run:
@@ -159,7 +159,7 @@ def process_daily(settings: Settings, state: StateManager, deliver: Callable[[st
             elif ev and ev["type"] == "exit":
                 text = format_exit(ev, settings.timezone)
             if text:
-                result = deliver(text)
+                result = deliver(text, asset)
                 if dry_run:
                     summary["events"].append({"asset": asset, **{k: ev[k] for k in ("type", "day")}})
                     pos = pos_after

@@ -55,7 +55,7 @@ def main() -> int:
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     from scanner.config import load_settings
-    from scanner.runner import run_scan
+    from scanner.engine import run_scan
     from scanner.whatsapp_notifier import WhatsAppError, get_notifier
 
     settings = load_settings()
@@ -96,25 +96,19 @@ def main() -> int:
         print(f"Enviado como {res['delivered_as']}: {json.dumps(res['response'])}")
         return 0
 
-    result = run_scan(settings, dry_run=args.dry_run or None, mode=args.mode)
+    result = run_scan(settings, dry_run=args.dry_run or None)
 
     if args.json:
         print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     else:
         print("\n=== Resumen ===")
-        for a in result["analyses"]:
-            print(f"{a['asset']:8} {a['price']:>12,.2f}  24h {a['change_24h_pct']:+6.2f}%  "
-                  f"pos {a['range_position_pct']:5.1f}%  RSI {a['rsi_1h']:5.1f}  "
-                  f"LONG {a['long_score']:5.1f}  SHORT {a['short_score']:5.1f}  -> {a['direction']}"
-                  f"  [{a['source']}]")
-        if not result["gold_market_open"]:
-            print("XAU/USD  mercado cerrado (omitido)")
-        for asset, err in result["errors"].items():
-            print(f"{asset}: ERROR {err}")
-        print(f"Señales nuevas: {result['new_signals'] or 'ninguna'}")
-
-    # Falla el job de GitHub solo si TODOS los activos fallaron
-    return 1 if result["errors"] and not result["analyses"] else 0
+        print(f"Personas: {result['people']}")
+        for ev in result["daily"]:
+            print(f"Tendencia diaria: {ev}")
+        for key, err in result["errors"].items():
+            print(f"{key}: ERROR {err[:200]}")
+        print(f"Señales enviadas: {result['signals'] or 'ninguna'}")
+    return 0
 
 
 if __name__ == "__main__":

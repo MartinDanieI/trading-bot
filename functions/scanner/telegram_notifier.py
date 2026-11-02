@@ -72,22 +72,23 @@ class TelegramNotifier:
             body = self._call("sendMessage", payload)
         return body["result"]["message_id"]
 
-    def notify(self, text: str) -> dict:
-        """Envía a cada chat de TELEGRAM_CHAT_ID (separados por comas).
+    def notify(self, text: str, chat_ids: list[str] | None = None) -> dict:
+        """Envía a los chats indicados (por defecto, los de TELEGRAM_CHAT_ID).
 
         Basta con que llegue a uno para darlo por enviado; los fallos se registran.
         """
         sent: dict[str, int] = {}
         failed: dict[str, str] = {}
-        for chat_id in self.s.telegram_chat_ids:
+        for chat_id in (chat_ids if chat_ids is not None else self.s.telegram_chat_ids):
             try:
                 sent[chat_id] = self._send(chat_id, text)
             except WhatsAppError as exc:
-                log.error("Telegram: no se pudo enviar al chat %s: %s", chat_id, exc)
+                # el repo es público: en los logs solo los últimos dígitos del chat
+                log.error("Telegram: no se pudo enviar al chat …%s: %s", str(chat_id)[-3:], exc)
                 failed[chat_id] = str(exc)
         if not sent:
             raise WhatsAppError(f"Telegram: ningún chat recibió la alerta ({failed})")
-        return {"delivered_as": "telegram", "response": {"enviados": sent, "fallidos": failed}}
+        return {"delivered_as": "telegram", "response": {"enviados": len(sent), "fallidos": len(failed)}}
 
     def recent_chats(self) -> list[dict]:
         """Chats que le escribieron al bot recientemente (para descubrir el chat_id)."""

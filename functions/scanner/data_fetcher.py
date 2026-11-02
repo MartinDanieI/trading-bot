@@ -224,11 +224,14 @@ def fetch_candles(asset: str, timeframe: str, bars: int) -> tuple[pd.DataFrame, 
 
     tf_days = {"5m": 3, "15m": 5, "1h": 15, "4h": 59}
     days = max(tf_days[timeframe], int(bars * TIMEFRAMES[timeframe].total_seconds() / 86400 * 1.6) + 2)
-    sources = ([("Kraken BTC/USD", lambda: kraken("BTC/USD")),
-                ("Yahoo BTC-USD", lambda: fetch_history(asset, timeframe, days))]
-               if asset == "BTC/USD" else
-               [("Yahoo GC=F (futuros oro)", lambda: fetch_history(asset, timeframe, days)),
-                ("Kraken PAXG/USD (proxy oro)", lambda: kraken("PAXG/USD"))])
+    yahoo_gold = ("Yahoo GC=F (futuros oro)", lambda: fetch_history(asset, timeframe, days))
+    paxg = ("Kraken PAXG/USD (proxy oro)", lambda: kraken("PAXG/USD"))
+    if asset == "BTC/USD":
+        sources = [("Kraken BTC/USD", lambda: kraken("BTC/USD")),
+                   ("Yahoo BTC-USD", lambda: fetch_history(asset, timeframe, days))]
+    else:
+        # Yahoo entrega el oro con unos minutos de atraso: en 5m (scalping) va primero PAXG, en tiempo real
+        sources = [paxg, yahoo_gold] if timeframe == "5m" else [yahoo_gold, paxg]
     errors = []
     for name, fn in sources:
         try:

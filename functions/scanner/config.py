@@ -55,6 +55,8 @@ class Settings:
     entry_zone_r: float  # ancho de la zona de entrada a cada lado, en R
     late_signals: str  # skip (no enviar) | mark (enviar marcada como tarde)
     active_strategies: tuple[str, ...]  # tendencia_diaria (principal) y/o confluencia (1h)
+    worker_url: str  # bot de Telegram en Cloudflare (lista de personas y sus estrategias)
+    worker_api_key: str
     timezone: str
 
     # Estado
@@ -113,6 +115,8 @@ def load_settings() -> Settings:
         report_weekday=int(_float("REPORT_WEEKDAY", 6)),
         report_hour=int(_float("REPORT_HOUR", 18)),
         entry_zone_r=_float("ENTRY_ZONE_R", 0.3),
+        worker_url=os.getenv("WORKER_URL", "").strip(),
+        worker_api_key=os.getenv("WORKER_API_KEY", "").strip(),
         active_strategies=tuple(s.strip().lower() for s in
                                 os.getenv("ACTIVE_STRATEGIES", "tendencia_diaria").split(",") if s.strip()),
         late_signals="mark" if os.getenv("LATE_SIGNALS", "skip").strip().lower() == "mark" else "skip",
