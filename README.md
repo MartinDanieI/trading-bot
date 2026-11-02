@@ -56,6 +56,15 @@ Hay señal si el mejor puntaje ≥ `SCORE_THRESHOLD` (70) y supera al de la dire
 `📊 REPORTE SEMANAL` con las señales de los últimos 7 días evaluadas contra el precio real:
 ganadas, perdidas, % de acierto y resultado en R.
 
+**Cada persona elige sus estrategias (1 a 4) en Telegram.** El bot de la carpeta `worker/` (Cloudflare
+Workers, gratis) recibe los mensajes: las personas nuevas quedan pendientes hasta que el administrador
+pulsa ✅ Aprobar, y luego eligen estrategias y activos con botones (`/estrategias`, `/activos`, `/pausa`,
+`/reanudar`, `/estado`; el administrador además `/usuarios`, `/aprobar <id>`, `/quitar <id>`).
+El escáner (`functions/scanner/engine.py`) corre cada 5 minutos, revisa cada estrategia cuando cierra una
+vela de su temporalidad y manda cada señal solo a quienes la eligieron. Catálogo: Tendencia diaria, Swing 4h,
+Confluencia, Reversión a la media, Ruptura de sesión, Smart Money y Scalping (`strategies.py`). El menú
+muestra el resultado real del backtest de cada una (`scripts/build_worker_catalog.py`).
+
 **Estrategia principal: Tendencia diaria** (`functions/scanner/daily_trend.py`). Reglas "Turtle" en velas
 diarias: entrada al romper el máximo (mínimo) de N días, stop inicial de 2 ATR y salida cuando un día cierra
 debajo del mínimo (encima del máximo) de M días. BTC: 20/10 con filtro SMA 200, compras y ventas. Oro: 55/20,

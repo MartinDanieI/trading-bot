@@ -1,0 +1,58 @@
+[
+  {
+    "id": "tendencia_diaria",
+    "name": "Tendencia diaria",
+    "emoji": "📈",
+    "timeframe": "1d",
+    "description": "Reglas Turtle en velas diarias: entra cuando el precio rompe el máximo o mínimo de 20–55 días y sale con stop móvil. Pocas señales al año, operaciones de semanas. Es la única que ganó en 12 años de datos.",
+    "stats": "Backtest de 12 años (BTC) y 26 (Oro): acierto 44 % · +236 R · ~8 señales al año entre BTC y Oro · ⭐ ganó"
+  },
+  {
+    "id": "swing",
+    "name": "Swing 4h",
+    "emoji": "🏄",
+    "timeframe": "4h",
+    "description": "Sigue la tendencia de varios días: ruptura de 20 velas de 4 horas a favor de la EMA 200. Operaciones de días.",
+    "stats": "Backtest de 58 días: acierto 27 % · -2 R · ~1 señal a la semana · ⚠️ perdió"
+  },
+  {
+    "id": "confluencia",
+    "name": "Confluencia",
+    "emoji": "🧭",
+    "timeframe": "1h",
+    "description": "Combina EMAs, RSI, MACD, volumen y el rango de 24 horas en velas de 1 hora. Varias señales al día.",
+    "stats": "Backtest de 58 días: acierto 40 % · -25 R · ~9 señales al día · ⚠️ perdió"
+  },
+  {
+    "id": "reversion",
+    "name": "Reversión a la media",
+    "emoji": "🔄",
+    "timeframe": "1h",
+    "description": "Cuando el mercado está de lado, compra abajo y vende arriba de las Bandas de Bollinger esperando el regreso al promedio.",
+    "stats": "Backtest de 58 días: acierto 33 % · -5 R · ~1 señal a la semana · ⚠️ perdió"
+  },
+  {
+    "id": "sesion",
+    "name": "Ruptura de sesión",
+    "emoji": "🌍",
+    "timeframe": "15m",
+    "description": "Marca el rango de la primera hora de Londres y de Nueva York y entra cuando el precio lo rompe. Hasta 2 señales al día por activo.",
+    "stats": "Backtest de 58 días: acierto 36 % · -41 R · ~3 señales al día · ⚠️ perdió"
+  },
+  {
+    "id": "smc",
+    "name": "Smart Money (liquidez)",
+    "emoji": "💧",
+    "timeframe": "15m",
+    "description": "Busca barridas de liquidez: el precio pasa el máximo o mínimo de ayer solo con mecha y cierra de vuelta adentro.",
+    "stats": "Backtest de 58 días: acierto 15 % · -53 R · ~9 señales a la semana · ⚠️ perdió"
+  },
+  {
+    "id": "scalping",
+    "name": "Scalping",
+    "emoji": "⚡",
+    "timeframe": "5m",
+    "description": "Operaciones de minutos en velas de 5 minutos: retroceso a la EMA 20 a favor de la tendencia con VWAP y RSI. Muchas señales; hay que entrar enseguida.",
+    "stats": "Backtest de 58 días: acierto 49 % · -523 R · ~26 señales al día · ⚠️ perdió"
+  }
+]

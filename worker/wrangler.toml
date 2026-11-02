@@ -1,0 +1,13 @@
+# Bot de Telegram del escáner (Cloudflare Workers, plan gratis).
+# Secretos (no van aquí, el repo es público):
+#   npx wrangler secret put BOT_TOKEN       token de @BotFather
+#   npx wrangler secret put WEBHOOK_SECRET  clave que Telegram manda en cada webhook
+#   npx wrangler secret put API_KEY         clave con la que el escáner pide la lista de personas
+#   npx wrangler secret put ADMIN_ID        chat_id del administrador (quien aprueba personas)
+name = "senales-trading-bot"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+
+[[kv_namespaces]]
+binding = "USERS"
+id = "REEMPLAZAR_CON_EL_ID_DEL_KV"

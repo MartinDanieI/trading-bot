@@ -2,7 +2,7 @@ name: Escáner horario BTC / XAU
 
 on:
   schedule:
-    # Disparo principal: cron-job.org llama cada hora a la API (workflow_dispatch), que es puntual.
+    # Disparo principal: cron-job.org llama cada 5 minutos a la API (workflow_dispatch), que es puntual.
     # Esto es solo un RESPALDO cada 2 horas: el horario propio de GitHub se retrasa o salta
     # ejecuciones, sobre todo en la hora en punto (por eso el minuto 37).
     - cron: "37 */2 * * *"
@@ -37,6 +37,9 @@ jobs:
       CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      # Bot de Telegram en Cloudflare: lista de personas y sus estrategias
+      WORKER_URL: ${{ secrets.WORKER_URL }}
+      WORKER_API_KEY: ${{ secrets.WORKER_API_KEY }}
       ALERT_PROVIDER: ${{ vars.ALERT_PROVIDER || 'auto' }}
       # Opcionales (Settings > Secrets and variables > Actions > Variables)
       ALERT_MODE: ${{ vars.ALERT_MODE || 'SIGNALS_ONLY' }}
