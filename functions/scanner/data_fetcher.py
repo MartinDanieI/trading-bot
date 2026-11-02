@@ -30,7 +30,8 @@ T = TypeVar("T")
 
 CANDLES = 100
 MIN_CANDLES = 60  # EMA50 + margen; menos que esto se considera fallo
-TIMEFRAMES = {"1h": timedelta(hours=1), "15m": timedelta(minutes=15)}
+TIMEFRAMES = {"5m": timedelta(minutes=5), "15m": timedelta(minutes=15), "1h": timedelta(hours=1),
+              "4h": timedelta(hours=4)}
 # periodo que se pide a Yahoo para obtener >= 100 velas de cada temporalidad
 YF_PERIOD = {"1h": "10d", "15m": "5d"}
 COLUMNS = ["open", "high", "low", "close", "volume"]
@@ -197,6 +198,49 @@ def fetch_live_price(asset: str, source: str) -> float | None:
     return None
 
 
+def resample_ohlcv(df: pd.DataFrame, rule: str) -> pd.DataFrame:
+    """Agrupa velas (ej. 1h -> 4h) alineadas a medianoche UTC, igual que Kraken."""
+    out = df.resample(rule, origin="epoch", label="left", closed="left").agg(
+        {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"})
+    return out.dropna(subset=["close"])
+
+
+def fetch_candles(asset: str, timeframe: str, bars: int) -> tuple[pd.DataFrame, str]:
+    """Velas cerradas recientes para el escaneo en vivo. Devuelve (velas, fuente).
+
+    BTC: Kraken primero (más fresco), luego Yahoo. Oro: Yahoo (GC=F) y luego PAXG en Kraken.
+    """
+    def kraken(symbol: str) -> pd.DataFrame:
+        import ccxt
+
+        def _call() -> pd.DataFrame:
+            rows = ccxt.kraken({"enableRateLimit": True, "timeout": 20000}).fetch_ohlcv(
+                symbol, timeframe=timeframe, limit=min(bars + 1, 720))
+            df = pd.DataFrame(rows, columns=["ts", *COLUMNS])
+            df.index = pd.to_datetime(df.pop("ts"), unit="ms", utc=True)
+            return _drop_unclosed(df.astype(float), timeframe)
+
+        return with_retries(_call, f"kraken {symbol} {timeframe}", attempts=2)
+
+    tf_days = {"5m": 3, "15m": 5, "1h": 15, "4h": 59}
+    days = max(tf_days[timeframe], int(bars * TIMEFRAMES[timeframe].total_seconds() / 86400 * 1.6) + 2)
+    sources = ([("Kraken BTC/USD", lambda: kraken("BTC/USD")),
+                ("Yahoo BTC-USD", lambda: fetch_history(asset, timeframe, days))]
+               if asset == "BTC/USD" else
+               [("Yahoo GC=F (futuros oro)", lambda: fetch_history(asset, timeframe, days)),
+                ("Kraken PAXG/USD (proxy oro)", lambda: kraken("PAXG/USD"))])
+    errors = []
+    for name, fn in sources:
+        try:
+            df = fn()
+            if len(df) >= min(bars, 60):
+                return df.tail(bars), name
+            errors.append(f"{name}: solo {len(df)} velas")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{name}: {exc}")
+    raise DataUnavailableError(f"{asset} {timeframe}: {' | '.join(errors)}")
+
+
 HISTORY_TICKERS = {"BTC/USD": ["BTC-USD"], "XAU/USD": ["GC=F", "XAUUSD=X"]}
 HISTORY_KRAKEN = {"BTC/USD": "BTC/USD", "XAU/USD": "PAXG/USD"}
 
@@ -210,18 +254,22 @@ def fetch_history(asset: str, timeframe: str, days: int) -> pd.DataFrame:
     import yfinance as yf
 
     warnings.filterwarnings("ignore", module=r"yfinance(\.|$)")
-    days = min(days, 59) if timeframe == "15m" else days
+    days = min(days, 59) if timeframe in ("5m", "15m") else days
+    yf_interval = "1h" if timeframe == "4h" else timeframe  # Yahoo no tiene 4h: se agrupa desde 1h
     errors = []
     for ticker in HISTORY_TICKERS[asset]:
         try:
-            raw = yf.Ticker(ticker).history(period=f"{days}d", interval=timeframe, auto_adjust=False)
+            raw = yf.Ticker(ticker).history(period=f"{days}d", interval=yf_interval, auto_adjust=False)
             if raw is None or raw.empty:
                 raise ValueError("respuesta vacía")
             df = raw.rename(columns=str.lower)
             idx = pd.DatetimeIndex(df.index)
             df.index = idx.tz_localize("UTC") if idx.tz is None else idx.tz_convert("UTC")
             df = df[COLUMNS].astype(float).dropna(subset=["open", "high", "low", "close"])
-            return _drop_unclosed(df[~df.index.duplicated(keep="last")].sort_index(), timeframe)
+            df = df[~df.index.duplicated(keep="last")].sort_index()
+            if timeframe == "4h":
+                df = resample_ohlcv(_drop_unclosed(df, "1h"), "4h")
+            return _drop_unclosed(df, timeframe)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"yahoo {ticker}: {exc}")
     try:

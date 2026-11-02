@@ -7,11 +7,14 @@ Lo usan el backtest (backtest.py) y el reporte semanal, con las mismas reglas:
       (criterio conservador: nunca se inflan los resultados).
     - Gestión simulada: 50 % se cierra en TP1 y el SL del resto pasa a la
       entrada (break-even); el otro 50 % se cierra en TP2.
-          SL antes de TP1           -> -1.00 R   (perdida)
-          TP1 y luego break-even    -> +0.75 R   (ganada)
-          TP1 y luego TP2           -> +2.00 R   (ganada)
-          Ni SL ni TP1 en HORIZON h -> se cierra al precio de ese momento (expirada)
+          SL antes de TP1           -> -1 R                       (perdida)
+          TP1 y luego break-even    -> +0.5 x R(TP1)              (ganada)
+          TP1 y luego TP2           -> +0.5 x R(TP1) + 0.5 x R(TP2) (ganada)
+          Ni SL ni TP1 en el horizonte -> se cierra al precio de ese momento (expirada)
+      (con TP1 = 1.5 R y TP2 = 2.5 R eso da +0.75 R y +2.0 R)
     - R = lo que se arriesga en la operación (distancia entrada-SL).
+    - A cada operación cerrada se le resta el costo de comisión + spread (COSTS),
+      expresado en R: cuanto más pequeño el stop, más pesa.
 
 "Acierto" = porcentaje de señales cerradas que llegaron a TP1 antes que al SL.
 """
@@ -24,8 +27,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 HORIZON = timedelta(hours=48)
-R_TP1_THEN_BE = 0.5 * 1.5 + 0.5 * 0.0
-R_TP1_THEN_TP2 = 0.5 * 1.5 + 0.5 * 2.5
+# Costo ida y vuelta (comisión + spread) como fracción del precio
+COSTS = {"BTC/USD": 0.0006, "XAU/USD": 0.0002}
 
 
 @dataclass
@@ -59,8 +62,12 @@ def evaluate_signal(m15: pd.DataFrame, asset: str, direction: str, sent_at: date
     future = m15[(m15.index >= sent_ts) & (m15.index < end)]
     risk = abs(entry - stop_loss)
     up = direction == "LONG"
+    r1, r2 = abs(tp1 - entry) / risk, abs(tp2 - entry) / risk
+    cost_r = COSTS.get(asset, 0.0) * entry / risk
 
     def result(outcome: str, r: float, ts) -> TradeResult:
+        if outcome != "abierta":
+            r -= cost_r
         return TradeResult(asset, direction, sent_ts.isoformat(), entry, stop_loss, tp1, tp2,
                            outcome, round(r, 2), None if ts is None else pd.Timestamp(ts).isoformat())
 
@@ -70,20 +77,21 @@ def evaluate_signal(m15: pd.DataFrame, asset: str, direction: str, sent_at: date
         hit_sl = c["low"] <= stop if up else c["high"] >= stop
         if hit_sl:  # conservador: el SL se evalúa antes que los TP en la misma vela
             return result("ganada_tp1" if hit_tp1 else "perdida",
-                          R_TP1_THEN_BE if hit_tp1 else -1.0, ts)
+                          0.5 * r1 if hit_tp1 else -1.0, ts)
         if not hit_tp1 and (c["high"] >= tp1 if up else c["low"] <= tp1):
             hit_tp1 = True
             stop = entry  # break-even para la mitad restante
         if hit_tp1 and (c["high"] >= tp2 if up else c["low"] <= tp2):
-            return result("ganada_tp2", R_TP1_THEN_TP2, ts)
+            return result("ganada_tp2", 0.5 * r1 + 0.5 * r2, ts)
 
-    complete = len(future) and future.index[-1] + timedelta(minutes=15) >= end
+    bar = m15.index.to_series().diff().median() if len(m15) > 1 else timedelta(minutes=15)
+    complete = len(future) and future.index[-1] + bar >= end
     if not complete:
         return result("abierta", 0.0, None)
     last = float(future["close"].iloc[-1])
     if hit_tp1:  # mitad cerrada en TP1, la otra al precio final (nunca peor que break-even)
         rest = max((last - entry) / risk if up else (entry - last) / risk, 0.0)
-        return result("ganada_tp1", 0.5 * 1.5 + 0.5 * rest, future.index[-1])
+        return result("ganada_tp1", 0.5 * r1 + 0.5 * rest, future.index[-1])
     move = (last - entry) / risk if up else (entry - last) / risk
     return result("expirada", move, future.index[-1])
 
