@@ -31,7 +31,7 @@ T = TypeVar("T")
 CANDLES = 100
 MIN_CANDLES = 60  # EMA50 + margen; menos que esto se considera fallo
 TIMEFRAMES = {"5m": timedelta(minutes=5), "15m": timedelta(minutes=15), "1h": timedelta(hours=1),
-              "4h": timedelta(hours=4)}
+              "4h": timedelta(hours=4), "1d": timedelta(days=1)}
 # periodo que se pide a Yahoo para obtener >= 100 velas de cada temporalidad
 YF_PERIOD = {"1h": "10d", "15m": "5d"}
 COLUMNS = ["open", "high", "low", "close", "volume"]

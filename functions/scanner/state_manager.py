@@ -160,6 +160,13 @@ class StateManager:
         return [i for i in self._get(HISTORY_KEY).get("items", [])
                 if datetime.fromisoformat(i["sent_at"]) >= since]
 
+    def get(self, key: str) -> dict:
+        """Documento genérico del estado ({} si no existe)."""
+        return self._get(key)
+
+    def put(self, key: str, value: dict) -> None:
+        self._put(key, value)
+
     def heartbeat_sent_on(self, local_date: str) -> bool:
         return self._get(HEARTBEAT_KEY).get("date") == local_date
 

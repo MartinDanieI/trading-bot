@@ -56,6 +56,14 @@ Hay señal si el mejor puntaje ≥ `SCORE_THRESHOLD` (70) y supera al de la dire
 `📊 REPORTE SEMANAL` con las señales de los últimos 7 días evaluadas contra el precio real:
 ganadas, perdidas, % de acierto y resultado en R.
 
+**Estrategia principal: Tendencia diaria** (`functions/scanner/daily_trend.py`). Reglas "Turtle" en velas
+diarias: entrada al romper el máximo (mínimo) de N días, stop inicial de 2 ATR y salida cuando un día cierra
+debajo del mínimo (encima del máximo) de M días. BTC: 20/10 con filtro SMA 200, compras y ventas. Oro: 55/20,
+solo compras. Validada en `research/trend_research.py` con 12 años de BTC y 26 de Oro, comisiones incluidas.
+El bot avisa la entrada, manda un 📌 SEGUIMIENTO diario mientras la posición está abierta y un 🔔 SALIDA al
+cerrarla. La estrategia horaria anterior (Confluencia) perdió en el backtest con costos y quedó apagada; se
+puede reactivar con `ACTIVE_STRATEGIES=tendencia_diaria,confluencia`.
+
 **Zona de entrada:** justo antes de enviar una señal el bot consulta el precio en vivo. El mensaje trae
 `📍 Zona de entrada` (entrada ± `ENTRY_ZONE_R` × riesgo, 0.3 por defecto) y el precio al enviar. Si el precio
 ya salió de la zona, la señal no se envía (`LATE_SIGNALS=skip`) o llega como `⏰ SEÑAL TARDE · NO ENTRAR` (`mark`).

@@ -54,6 +54,7 @@ class Settings:
     report_hour: int
     entry_zone_r: float  # ancho de la zona de entrada a cada lado, en R
     late_signals: str  # skip (no enviar) | mark (enviar marcada como tarde)
+    active_strategies: tuple[str, ...]  # tendencia_diaria (principal) y/o confluencia (1h)
     timezone: str
 
     # Estado
@@ -112,6 +113,8 @@ def load_settings() -> Settings:
         report_weekday=int(_float("REPORT_WEEKDAY", 6)),
         report_hour=int(_float("REPORT_HOUR", 18)),
         entry_zone_r=_float("ENTRY_ZONE_R", 0.3),
+        active_strategies=tuple(s.strip().lower() for s in
+                                os.getenv("ACTIVE_STRATEGIES", "tendencia_diaria").split(",") if s.strip()),
         late_signals="mark" if os.getenv("LATE_SIGNALS", "skip").strip().lower() == "mark" else "skip",
         timezone=os.getenv("REPORT_TIMEZONE", "America/Bogota").strip(),
         state_backend=os.getenv("STATE_BACKEND", "auto").strip().lower(),

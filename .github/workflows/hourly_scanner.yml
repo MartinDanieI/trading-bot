@@ -47,6 +47,7 @@ jobs:
       REPORT_HOUR: ${{ vars.REPORT_HOUR || '18' }}
       ENTRY_ZONE_R: ${{ vars.ENTRY_ZONE_R || '0.3' }}
       LATE_SIGNALS: ${{ vars.LATE_SIGNALS || 'skip' }}
+      ACTIVE_STRATEGIES: ${{ vars.ACTIVE_STRATEGIES || 'tendencia_diaria' }}
       WHATSAPP_TEMPLATE_NAME: ${{ vars.WHATSAPP_TEMPLATE_NAME || 'hello_world' }}
       WHATSAPP_TEMPLATE_LANG: ${{ vars.WHATSAPP_TEMPLATE_LANG || 'en_US' }}
       WHATSAPP_TEMPLATE_HAS_BODY_PARAM: ${{ vars.WHATSAPP_TEMPLATE_HAS_BODY_PARAM || 'false' }}

@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from . import trend_runner
 from .config import Settings, load_settings
 from .data_fetcher import (DataUnavailableError, fetch_btc, fetch_gold, fetch_history,
                            fetch_live_price, is_gold_market_open)
@@ -99,7 +100,8 @@ def format_summary_block(a: Analysis) -> str:
 
 
 def format_heartbeat(settings: Settings, now: datetime, analyses: list[Analysis],
-                     gold_open: bool, errors: dict[str, str], recent: list[dict]) -> str:
+                     gold_open: bool, errors: dict[str, str], recent: list[dict],
+                     extra: list[str] | None = None, show_signals: bool = True) -> str:
     tz = ZoneInfo(settings.timezone)
     if recent:
         detail = ", ".join(
@@ -112,11 +114,12 @@ def format_heartbeat(settings: Settings, now: datetime, analyses: list[Analysis]
     prices = [f"{a.asset.split('/')[0]} {_fmt(a.price)} ({a.change_24h_pct:+.1f}%)" for a in analyses]
     if not gold_open:
         prices.append("Oro: mercado cerrado")
-    lines = [
-        f"💚 *ESTADO DEL BOT* · Activo · {_stamp(settings, now)}",
-        f"📬 Señales últimas 24h: {signals}",
-        f"💲 {' · '.join(prices)}",
-    ]
+    lines = [f"💚 *ESTADO DEL BOT* · Activo · {_stamp(settings, now)}"]
+    lines += [f"📊 {line}" for line in extra or []]
+    if show_signals:
+        lines.append(f"📬 Señales de Confluencia últimas 24h: {signals}")
+    if analyses:
+        lines.append(f"💲 {' · '.join(prices)}")
     lines += [f"❗ {asset}: sin datos en esta revisión" for asset in errors]
     lines.append("_Si mañana no llega este mensaje, revisen GitHub → Actions._")
     return "\n".join(lines)
@@ -126,7 +129,8 @@ def _short(asset: str) -> str:
     return "Oro" if asset.startswith("XAU") else asset.split("/")[0]
 
 
-def weekly_report(settings: Settings, now: datetime, history: list[dict]) -> str:
+def weekly_report(settings: Settings, now: datetime, history: list[dict],
+                  trend_lines: list[str] | None = None, confluence: bool = True) -> str:
     """Evalúa las señales de los últimos 7 días contra el precio real (performance.py)."""
     tz = ZoneInfo(settings.timezone)
     trades = []
@@ -150,10 +154,15 @@ def weekly_report(settings: Settings, now: datetime, history: list[dict]) -> str
         f"🗓 {start:%d/%m} – {now.astimezone(tz):%d/%m}",
         "━━━━━━━━━━━━━━━",
     ]
+    if trend_lines:
+        lines += trend_lines + ["━━━━━━━━━━━━━━━"]
     s = summarize(trades)
-    if not trades:
-        lines.append("Esta semana no hubo señales. El mercado no dio entradas claras.")
+    if not confluence:
+        lines.append("_R = lo que se arriesga por operación. +2 R = ganar el doble de lo arriesgado._")
+    elif not trades:
+        lines.append("Confluencia: esta semana no hubo señales.")
     else:
+        lines.append("*🧭 Confluencia (1h)*")
         pct = "—" if s["acierto_pct"] is None else f"{s['acierto_pct']:.0f}%"
         lines += [
             f"🎯 Señales: *{s['senales']}*",
@@ -215,11 +224,13 @@ def run_scan(
     log.info("Escaneo %s · modo %s · estado %s · dry_run=%s",
              now.isoformat(timespec="minutes"), mode, state.name, dry_run)
 
-    fetchers = [("BTC/USD", fetch_btc)]
+    confluence = "confluencia" in settings.active_strategies
+    trend = trend_runner.is_active(settings)
+    fetchers = [("BTC/USD", fetch_btc)] if confluence else []
     gold_open = is_gold_market_open(now)
-    if gold_open:
+    if gold_open and confluence:
         fetchers.append(("XAU/USD", fetch_gold))
-    else:
+    elif confluence:
         log.info("Mercado del Oro cerrado: se omite XAU/USD.")
 
     analyses: list[Analysis] = []
@@ -263,7 +274,7 @@ def run_scan(
         late = " · ⏰ *tarde, no entrar*" if c["late"] else ""
         return f"\n📍 Zona {_fmt(c['low'])} – {_fmt(c['high'])}{late}"
 
-    if mode == "HOURLY_SUMMARY":
+    if mode == "HOURLY_SUMMARY" and confluence:
         blocks = [f"🕐 *RESUMEN HORARIO* · {_stamp(settings, now)}"]
         blocks += [format_summary_block(a) + zone_line(a) for a in analyses]
         if not gold_open:
@@ -280,6 +291,12 @@ def run_scan(
             sent[a.asset] = _deliver(settings, text, dry_run)
             deliveries.append(sent[a.asset])
 
+    # Tendencia diaria: una vez por vela diaria cerrada (entradas, seguimiento y salidas)
+    daily = (trend_runner.process_daily(settings, state, lambda t: _deliver(settings, t, dry_run), dry_run)
+             if trend else {})
+    for ev in daily.get("events", []):
+        log.info("Tendencia diaria: %s", ev)
+
     # Solo se registra una señal que realmente se envió (nunca en dry-run)
     for a in fresh:
         if sent[a.asset].get("delivered_as") not in ("console", "error"):
@@ -292,7 +309,9 @@ def run_scan(
     today = local.date().isoformat()
     if 0 <= settings.heartbeat_hour <= local.hour and not state.heartbeat_sent_on(today):
         recent = state.signals_since(now - timedelta(hours=24))
-        text = format_heartbeat(settings, now, analyses, gold_open, errors, recent)
+        text = format_heartbeat(settings, now, analyses, gold_open, errors, recent,
+                                extra=trend_runner.heartbeat_lines(state, settings.timezone) if trend else None,
+                                show_signals=confluence)
         result = _deliver(settings, text, dry_run)
         deliveries.append(result)
         if result.get("delivered_as") not in ("console", "error"):
@@ -304,7 +323,9 @@ def run_scan(
     due = (local.weekday() > settings.report_weekday
            or (local.weekday() == settings.report_weekday and local.hour >= settings.report_hour))
     if settings.report_weekday >= 0 and due and not state.weekly_sent(week):
-        text = weekly_report(settings, now, state.signals_since(now - timedelta(days=7)))
+        text = weekly_report(settings, now, state.signals_since(now - timedelta(days=7)),
+                             trend_lines=trend_runner.weekly_lines(state, now, settings.timezone)
+                             if trend else None, confluence=confluence)
         result = _deliver(settings, text, dry_run)
         deliveries.append(result)
         if result.get("delivered_as") not in ("console", "error"):
@@ -319,5 +340,6 @@ def run_scan(
         "analyses": [a.to_dict() for a in analyses],
         "new_signals": [f"{a.asset} {a.direction}" for a in fresh],
         "deliveries": deliveries,
-        "errors": errors,
+        "errors": {**errors, **daily.get("errors", {})},
+        "daily": daily.get("events", []),
     }
