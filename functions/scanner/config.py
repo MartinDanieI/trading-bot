@@ -109,7 +109,7 @@ def load_settings() -> Settings:
         template_has_body_param=_bool("WHATSAPP_TEMPLATE_HAS_BODY_PARAM", False),
         always_template=_bool("WHATSAPP_ALWAYS_TEMPLATE", False),
         alert_mode=mode,
-        score_threshold=_float("SCORE_THRESHOLD", 70.0),
+        score_threshold=_float("SCORE_THRESHOLD", 80.0),
         cooldown_hours=_float("COOLDOWN_HOURS", 4.0),
         heartbeat_hour=int(_float("HEARTBEAT_HOUR", 8)),
         report_weekday=int(_float("REPORT_WEEKDAY", 6)),

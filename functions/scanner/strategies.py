@@ -19,6 +19,7 @@ Tendencia diaria mostró ventaja con costos incluidos (ver backtest.py).
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Callable
@@ -232,7 +233,8 @@ def confluencia(data: dict[str, pd.DataFrame], asset: str) -> list[Signal]:
     from .strategy import analyze
 
     h1, m15 = data["1h"], data["15m"]
-    a = analyze(MarketData(asset, "", h1.tail(100), m15.tail(100)), threshold=70)
+    threshold = float(os.getenv("SCORE_THRESHOLD", "80"))  # puntaje mínimo para avisar
+    a = analyze(MarketData(asset, "", h1.tail(100), m15.tail(100)), threshold=threshold)
     if a.direction == "NEUTRAL":
         return []
     lv = a.levels

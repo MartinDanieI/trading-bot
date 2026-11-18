@@ -45,7 +45,7 @@ El oro se **omite** sábados, viernes desde las 17:00 y domingos antes de las 18
 - **B · Momentum / Breakout** — EMA20 > EMA50 (25) · cerca del máximo 24h (20) · volumen > 1.2× media 24h (20) · RSI 52–68 (15) · histograma MACD creciente (10) · 15m alineado (10).
 
 **SHORT** es el espejo (rechazo en resistencia con RSI 60–78 cayendo, o breakdown con EMA20 < EMA50 y RSI 32–48).
-Hay señal si el mejor puntaje ≥ `SCORE_THRESHOLD` (70) y supera al de la dirección contraria.
+Hay señal si el mejor puntaje ≥ `SCORE_THRESHOLD` (80) y supera al de la dirección contraria.
 
 **Niveles:** Entrada = cierre de la última vela 1h cerrada · SL = 1.5 × ATR(14) · TP1 = 1.5 × riesgo · TP2 = 2.5 × riesgo.
 
@@ -277,7 +277,7 @@ pero este bot queda dentro de la capa gratuita.
 | `WHATSAPP_PHONE_NUMBER_ID` | — | ID del número emisor |
 | `WHATSAPP_TO` | — | Tu número (`57...`) |
 | `ALERT_MODE` | `SIGNALS_ONLY` | o `HOURLY_SUMMARY` |
-| `SCORE_THRESHOLD` | `70` | Puntaje mínimo para señal |
+| `SCORE_THRESHOLD` | `80` | Puntaje mínimo de Confluencia para avisar |
 | `COOLDOWN_HOURS` | `4` | Horas sin repetir la misma señal |
 | `HEARTBEAT_HOUR` | `8` | Hora local del mensaje diario (`-1` lo apaga) |
 | `WHATSAPP_TEMPLATE_NAME` / `_LANG` | `hello_world` / `en_US` | Plantilla de respaldo |

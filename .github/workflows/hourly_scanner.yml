@@ -43,7 +43,7 @@ jobs:
       ALERT_PROVIDER: ${{ vars.ALERT_PROVIDER || 'auto' }}
       # Opcionales (Settings > Secrets and variables > Actions > Variables)
       ALERT_MODE: ${{ vars.ALERT_MODE || 'SIGNALS_ONLY' }}
-      SCORE_THRESHOLD: ${{ vars.SCORE_THRESHOLD || '70' }}
+      SCORE_THRESHOLD: ${{ vars.SCORE_THRESHOLD || '80' }}
       COOLDOWN_HOURS: ${{ vars.COOLDOWN_HOURS || '4' }}
       HEARTBEAT_HOUR: ${{ vars.HEARTBEAT_HOUR || '8' }}
       REPORT_WEEKDAY: ${{ vars.REPORT_WEEKDAY || '6' }}
